@@ -1,0 +1,25 @@
+package improbable.test.csharp;
+
+// This file exists to ensure the C# code generators handle fields and events that
+// overlap with reserved C# keywords.
+
+type KeywordsReservedType {
+  int64 while = 1;
+  string for = 2;
+}
+
+component KeywordsReservedComponent {
+  id = 200001;
+
+  int64 var = 1;
+  string do = 2;
+
+  KeywordsReservedType private = 3;
+  list<KeywordsReservedType> protected = 4;
+  map<KeywordsReservedType, KeywordsReservedType> public = 5;
+  option<KeywordsReservedType> static = 6;
+
+  event KeywordsReservedType while;
+
+  command KeywordsReservedType volatile(KeywordsReservedType);
+}
