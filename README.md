@@ -1,5 +1,7 @@
 # .NET Core C# Worker (preview)
 
+![Build Status](https://badge.buildkite.com/f426be96e9dc5ae832eccefdfedf4291a8bbd6c6ec3b8abce0.svg?branch=master) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 This is an empty base worker, ready for you to add your game's specific logic to it.
 It is intended to be added to an existing SpatialOS project and as such, does not include SpatialOS configuration files and only an empty schema.
 
