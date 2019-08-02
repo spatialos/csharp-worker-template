@@ -1,5 +1,5 @@
 agent_queue_id: trigger-pipelines
-description: Dotnet worker.
+description: C# worker template.
 github:
   branch_configuration: []
   default_branch: master
