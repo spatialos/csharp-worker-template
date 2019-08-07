@@ -4,6 +4,7 @@
     <TargetFramework>netstandard2.0</TargetFramework>
     <Platforms>AnyCPU</Platforms>
     <LangVersion>latest</LangVersion>
+    <Version>0.0.1-preview</Version>
   </PropertyGroup>
 
   <ItemGroup>

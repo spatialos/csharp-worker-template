@@ -5,6 +5,7 @@
     <Platforms>x64</Platforms>
     <LangVersion>latest</LangVersion>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <Version>0.0.2-preview</Version>
   </PropertyGroup>
 
   <ItemGroup>

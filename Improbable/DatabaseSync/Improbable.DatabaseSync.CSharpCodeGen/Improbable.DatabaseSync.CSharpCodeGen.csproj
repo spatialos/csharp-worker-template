@@ -4,8 +4,6 @@
     <TargetFramework>netstandard2.0</TargetFramework>
     <IncludeBuildOutput>true</IncludeBuildOutput>
     <Version>0.0.1-preview</Version>
-    <Authors>Improbable Worlds, Ltd</Authors>
-    <Copyright>Improbable Worlds, Ltd</Copyright>
     <Description>SpatialOS DatabaseSync Persistence Generator</Description>
   </PropertyGroup>
 
