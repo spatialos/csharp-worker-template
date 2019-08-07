@@ -545,27 +545,6 @@ namespace Improbable.Stdlib
             }
         }
 
-        public IEnumerable<KeyValuePair<EntityId, Entity>> FindServiceEntities(uint componentId)
-        {
-            return FindServiceEntities(componentId, CancellationToken.None);
-        }
-
-        public IEnumerable<KeyValuePair<EntityId, Entity>> FindServiceEntities(uint componentId, CancellationToken token)
-        {
-            var serviceQuery = SendEntityQueryRequest(new EntityQuery {Constraint = new ComponentConstraint(componentId), ResultType = new SnapshotResultType()});
-            foreach (var opList in GetOpLists(TimeSpan.FromMilliseconds(16), token))
-            {
-                ProcessOpList(opList);
-
-                if (serviceQuery.IsCompleted)
-                {
-                    break;
-                }
-            }
-
-            return serviceQuery.Result.Results;
-        }
-
         private static async Task<double> GetCpuUsageForProcess(CancellationToken cancellationToken)
         {
             var startTime = DateTime.UtcNow;
