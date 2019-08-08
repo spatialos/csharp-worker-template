@@ -65,7 +65,7 @@ namespace Improbable.Postgres
         {
             metricsCancellationTokenSource = new CancellationTokenSource();
 
-            metricsPusherTask = Task.Run(() => Run(interval, metricsCancellationTokenSource.Token));
+            metricsPusherTask = Task.Run(() => Run(interval, metricsCancellationTokenSource.Token), metricsCancellationTokenSource.Token);
         }
 
         private async Task Run(TimeSpan interval, CancellationToken cancellationToken)
