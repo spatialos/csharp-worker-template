@@ -1,8 +1,6 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using System.Security.Cryptography;
 using Improbable.Stdlib;
 
 namespace Improbable.Postgres
@@ -16,6 +14,7 @@ namespace Improbable.Postgres
         public const string AdditionalFlagName = "postgres_additional";
 
         private string cachedConnectionString;
+        private readonly object rootLock = new object();
 
         private readonly Dictionary<string, string> flagValues = new Dictionary<string, string>
         {
@@ -84,55 +83,124 @@ namespace Improbable.Postgres
 
         public string PostgresHost
         {
-            get => flagValues[HostFlagName];
+            get
+            {
+                lock (rootLock)
+                {
+                    return flagValues[HostFlagName];
+                }
+            }
             set
             {
-                flagValues[HostFlagName] = value;
-                cachedConnectionString = null;
+                if (string.IsNullOrEmpty(value))
+                {
+                    throw new ArgumentNullException(nameof(PostgresHost));
+                }
+
+                lock (rootLock)
+                {
+                    flagValues[HostFlagName] = value;
+                    cachedConnectionString = null;
+                }
             }
         }
 
         public string PostgresUserName
         {
-            get => flagValues[UserNameFlagName];
+            get
+            {
+                lock (rootLock)
+                {
+                    return flagValues[UserNameFlagName];
+                }
+            }
             set
             {
-                flagValues[UserNameFlagName] = value;
-                cachedConnectionString = null;
+                if (string.IsNullOrEmpty(value))
+                {
+                    throw new ArgumentNullException(nameof(PostgresUserName));
+                }
+
+                lock (rootLock)
+                {
+                    flagValues[UserNameFlagName] = value;
+                    cachedConnectionString = null;
+                }
             }
         }
 
         public string PostgresPassword
         {
-            get => flagValues[PasswordFlagName];
+            get
+            {
+                lock (rootLock)
+                {
+                    return flagValues[PasswordFlagName];
+                }
+            }
             set
             {
-                flagValues[PasswordFlagName] = value;
-                cachedConnectionString = null;
+                if (string.IsNullOrEmpty(value))
+                {
+                    throw new ArgumentNullException(nameof(PostgresPassword));
+                }
+
+                lock (rootLock)
+                {
+                    flagValues[PasswordFlagName] = value;
+                    cachedConnectionString = null;
+                }
             }
         }
 
         public string PostgresDatabase
         {
-            get => flagValues[DatabaseFlagName];
+            get
+            {
+                lock (rootLock)
+                {
+                    return flagValues[DatabaseFlagName];
+                }
+            }
             set
             {
-                flagValues[DatabaseFlagName] = value;
-                cachedConnectionString = null;
+                lock (rootLock)
+                {
+                    flagValues[DatabaseFlagName] = value;
+                    cachedConnectionString = null;
+                }
             }
         }
 
         public string PostgresAdditionalOptions
         {
-            get => flagValues[AdditionalFlagName];
+            get
+            {
+                lock (rootLock)
+                {
+                    return flagValues[AdditionalFlagName];
+                }
+            }
             set
             {
-                flagValues[AdditionalFlagName] = value;
-                cachedConnectionString = null;
+                lock (rootLock)
+                {
+                    flagValues[AdditionalFlagName] = value;
+                    cachedConnectionString = null;
+                }
             }
         }
 
-        public string ConnectionString => cachedConnectionString ?? (cachedConnectionString = AsPostgresConnectionString());
+        public string ConnectionString
+        {
+            get
+            {
+                lock (rootLock)
+                {
+                    return cachedConnectionString ?? (cachedConnectionString = AsPostgresConnectionString());
+                }
+            }
+        }
 
         public void ProcessOpList(OpList opList)
         {
@@ -141,26 +209,48 @@ namespace Improbable.Postgres
                 string value = null;
                 if (opList.TryGetWorkerFlagChange(key, ref value))
                 {
-                    cachedConnectionString = null;
-                    flagValues[key] = value;
+                    lock (rootLock)
+                    {
+                        if (!string.IsNullOrEmpty(value) || IsEmptyStringAllowed(key))
+                        {
+                            flagValues[key] = value;
+                            cachedConnectionString = null;
+                        }
+                    }
                 }
             }
         }
-        
+
+        private static bool IsEmptyStringAllowed(string key)
+        {
+            switch (key)
+            {
+                case HostFlagName:
+                case UserNameFlagName:
+                case PasswordFlagName:
+                    return false;
+                default:
+                    return true;
+            }
+        }
+
         private string AsPostgresConnectionString()
         {
-            var additional = string.Empty;
-            if (!string.IsNullOrEmpty(PostgresDatabase))
+            lock (rootLock)
             {
-                additional = $";Database={PostgresDatabase}";
-            }
+                var additional = string.Empty;
+                if (!string.IsNullOrEmpty(PostgresDatabase))
+                {
+                    additional = $";Database={PostgresDatabase}";
+                }
 
-            if (!string.IsNullOrEmpty(PostgresAdditionalOptions))
-            {
-                additional += $";{PostgresAdditionalOptions}";
-            }
+                if (!string.IsNullOrEmpty(PostgresAdditionalOptions))
+                {
+                    additional += $";{PostgresAdditionalOptions}";
+                }
 
-            return $"Host={PostgresHost};Username={PostgresUserName};Password={PostgresPassword}{additional}";
+                return $"Host={PostgresHost};Username={PostgresUserName};Password={PostgresPassword}{additional}";
+            }
         }
     }
 }

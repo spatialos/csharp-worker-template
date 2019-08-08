@@ -9,7 +9,7 @@ namespace Improbable.Postgres
 {
     public class MetricsPusher : IDisposable
     {
-        private readonly CancellationTokenSource metricsCancellationTokenSource = new CancellationTokenSource();
+        private CancellationTokenSource metricsCancellationTokenSource;
         private readonly PostgresOptions postgresOptions;
         private Task metricsPusherTask;
 
@@ -20,9 +20,16 @@ namespace Improbable.Postgres
 
         public void Dispose()
         {
-            StopPushingMetrics();
+            metricsCancellationTokenSource?.Cancel();
+            metricsPusherTask?.Wait();
+
             metricsCancellationTokenSource?.Dispose();
             metricsPusherTask?.Dispose();
+
+            metricsCancellationTokenSource = null;
+            metricsPusherTask = null;
+
+            GC.SuppressFinalize(this);
         }
 
         private void Scrape()
@@ -56,15 +63,10 @@ namespace Improbable.Postgres
 
         public void StartPushingMetrics(TimeSpan interval)
         {
-            metricsPusherTask = Task.Run(() => Run(interval, metricsCancellationTokenSource.Token));
-        }
+            metricsCancellationTokenSource = new CancellationTokenSource();
 
-        public void StopPushingMetrics()
-        {
-            metricsCancellationTokenSource?.Cancel();
-            metricsPusherTask?.Wait();
+            metricsPusherTask = Task.Run(() => Run(interval, metricsCancellationTokenSource.Token), metricsCancellationTokenSource.Token);
         }
-
 
         private async Task Run(TimeSpan interval, CancellationToken cancellationToken)
         {
