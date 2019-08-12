@@ -1,6 +1,6 @@
 $ErrorActionPreference = "Stop"
 
-cd "$PSScriptRoot/../"
+Set-Location "$PSScriptRoot/../"
 
 $OutputDir=(Get-Location)
 
@@ -12,4 +12,11 @@ New-Item -ItemType Directory -Force -Path "$OutputDir/nupkgs" | Out-Null
 
 # For simplicity, some packages depend on Improbable.WorkerSdkInterop. Make sure that's packaged first.
 & dotnet pack Improbable/WorkerSdkInterop/Improbable.WorkerSdkInterop -p:Platform=x64 --output "$OutputDir/nupkgs"
+if (!$?) {
+    exit 1
+}
+
 & dotnet pack Improbable -p:Platform=x64 --output "$OutputDir/nupkgs"
+if (!$?) {
+    exit 1
+}

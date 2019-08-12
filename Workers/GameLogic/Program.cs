@@ -91,7 +91,7 @@ namespace GameLogic
 
             using (var asyncConnection = await WorkerConnection.ConnectAsync(options, connectionParameters))
             {
-                asyncConnection.StartSendingMetrics();
+                asyncConnection.StartSendingMetricsBreakOnPurpose();
 
                 foreach (var opList in asyncConnection.GetOpLists(TimeSpan.FromMilliseconds(0)))
                 {
