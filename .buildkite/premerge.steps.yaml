@@ -53,6 +53,8 @@ steps:
       - "/tmp/${BUILDKITE_BUILD_ID}/**/*"
     <<: *windows
 
+  -wait
+
   - label: "upload-pipeline"
-    command: "dotnet run --project scripts/GetDependentBranchNames | buildkite-agent pipeline upload"
+    command: "dotnet run --project scripts/GetDependentBranchNames"
     <<: *linux
