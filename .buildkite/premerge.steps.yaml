@@ -56,5 +56,5 @@ steps:
   - wait
 
   - label: "upload-pipeline"
-    command: "dotnet run --project scripts/GetDependentBranchNames"
+    command: "mkdir -p nupkgs && dotnet run --project scripts/GetDependentBranchNames | buildkite-agent pipeline upload"
     <<: *linux
