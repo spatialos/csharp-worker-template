@@ -11,6 +11,7 @@ namespace BuildNugetPackages
         {
             try
             {
+                // Default to "master", unless the downstream dependency has a branch matching the same name, then use that.
                 var currentBranch = RunRedirected("git", "rev-parse", "--abbrev-ref", "HEAD").Trim();
                 var checkRemoteBranch = RunRedirected("git", "ls-remote", "--heads", "https://github.com/spatialos/database-sync-worker.git", currentBranch).Trim();
 
@@ -23,7 +24,6 @@ namespace BuildNugetPackages
       branch: {remoteBranch}
       env:
         CSHARP_TEMPLATE_BRANCH: ""{currentBranch}""");
-
             }
             catch (Exception e)
             {
