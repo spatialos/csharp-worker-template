@@ -15,7 +15,7 @@ namespace BuildNugetPackages
                 var currentBranch = Environment.GetEnvironmentVariable("BUILDKITE_BRANCH");
                 var checkRemoteBranch = RunRedirected("git", "ls-remote", "--heads", "https://github.com/spatialos/database-sync-worker.git", currentBranch).Trim();
 
-                var remoteBranch = currentBranch == checkRemoteBranch ? currentBranch : "master";
+                var remoteBranch = checkRemoteBranch.Contains(currentBranch) ? currentBranch : "master";
 
                 Console.Out.WriteLine($@"steps:
   - label: ""build-database-sync-worker""
