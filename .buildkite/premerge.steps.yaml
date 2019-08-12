@@ -53,7 +53,7 @@ steps:
       - "/tmp/${BUILDKITE_BUILD_ID}/**/*"
     <<: *windows
 
-  -wait
+  - wait
 
   - label: "upload-pipeline"
     command: "dotnet run --project scripts/GetDependentBranchNames"
