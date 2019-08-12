@@ -59,4 +59,3 @@ steps:
       branch: "OS-375-findserviceentities"
       env:
         CSHARP_TEMPLATE_BRANCH: "$BUILDKITE_BRANCH"
-    <<: *linux
