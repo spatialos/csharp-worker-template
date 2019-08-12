@@ -145,7 +145,7 @@ namespace Improbable.Stdlib
             return tcs.Task;
         }
 
-        public void StartSendingMetricsBreakOnPurpose(params Action<Metrics>[] updaterList)
+        public void StartSendingMetrics(params Action<Metrics>[] updaterList)
         {
             if (metricsTask != null)
             {
