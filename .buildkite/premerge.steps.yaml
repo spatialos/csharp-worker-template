@@ -53,6 +53,7 @@ steps:
       - "/tmp/${BUILDKITE_BUILD_ID}/**/*"
     <<: *windows
 
+    # Wait for successful build on this pipeline before kick off dependent pipelines.
   - wait
 
   - label: "upload-pipeline"
