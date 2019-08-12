@@ -56,7 +56,7 @@ steps:
   - label: "test-database-sync-worker"
     trigger: database-sync-worker-premerge
     build:
-        branch: "OS-375-findserviceentities"
-    env:
-      CSHARP_TEMPLATE_BRANCH: "$BUILDKITE_BRANCH"
+      branch: "OS-375-findserviceentities"
+      env:
+        CSHARP_TEMPLATE_BRANCH: "$BUILDKITE_BRANCH"
     <<: *linux
