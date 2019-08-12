@@ -53,9 +53,7 @@ steps:
       - "/tmp/${BUILDKITE_BUILD_ID}/**/*"
     <<: *windows
 
-  - label: "build-database-sync-worker"
-    trigger: database-sync-worker-premerge
-    build:
-      branch: "OS-375-findserviceentities"
-      env:
-        CSHARP_TEMPLATE_BRANCH: "$BUILDKITE_BRANCH"
+  - label: "upload-pipeline"
+    command: "dotnet run --project scripts/GetDependentBranchNames | buildkite-agent pipeline upload"
+
+  - wait
