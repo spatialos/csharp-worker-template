@@ -52,3 +52,11 @@ steps:
     artifact_paths:
       - "/tmp/${BUILDKITE_BUILD_ID}/**/*"
     <<: *windows
+
+  - label: "test-database-sync-worker"
+    trigger: database-sync-worker-premerge
+    build:
+        branch: "OS-375-findserviceentities"
+    env:
+      CSHARP_TEMPLATE_BRANCH: "$BUILDKITE_BRANCH"
+    <<: *linux
