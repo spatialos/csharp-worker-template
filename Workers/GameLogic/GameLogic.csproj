@@ -6,7 +6,7 @@
     <LangVersion>7.2</LangVersion>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Improbable.Stdlib" Version="0.0.1-preview" />
+    <PackageReference Include="Improbable.Stdlib" Version="0.0.2-preview" />
     <PackageReference Include="Improbable.WorkerSdkInterop" Version="13.8.2" />
     <PackageReference Include="Serilog" Version="2.8.0" />
     <PackageReference Include="Serilog.Sinks.Console" Version="3.1.1" />
