@@ -60,7 +60,7 @@ namespace Improbable.Stdlib
 
                 case ILocatorOptions locatorOptions:
                     connectionParameters.Network.UseExternalIp = true;
-                    return ConnectAsync(locatorOptions.SpatialOsHost, locatorOptions.SpatialOsPort, connectionParameters, locatorOptions.Token, locatorOptions.PlayerId, locatorOptions.DisplayName, taskOptions);
+                    return ConnectAsync(locatorOptions.SpatialOsHost, locatorOptions.SpatialOsPort, locatorOptions.UseInsecureConnection, connectionParameters, locatorOptions.DevToken, locatorOptions.PlayerId, locatorOptions.DisplayName, taskOptions);
 
                 default:
                     throw new NotImplementedException("Unrecognized option type: " + workerOptions.GetType());
@@ -98,7 +98,7 @@ namespace Improbable.Stdlib
             return tcs.Task;
         }
 
-        public static Task<WorkerConnection> ConnectAsync(string host, ushort port, ConnectionParameters connectionParameters, string authToken, string playerId, string displayName, TaskCreationOptions taskOptions = TaskCreationOptions.None)
+        public static Task<WorkerConnection> ConnectAsync(string host, ushort port, bool useInsecureConnection, ConnectionParameters connectionParameters, string authToken, string playerId, string displayName, TaskCreationOptions taskOptions = TaskCreationOptions.None)
         {
             var tcs = new TaskCompletionSource<WorkerConnection>(taskOptions);
 
@@ -106,8 +106,8 @@ namespace Improbable.Stdlib
             {
                 try
                 {
-                    var pit = GetDevelopmentPlayerIdentityToken(host, port, authToken, playerId, displayName);
-                    var loginTokens = GetDevelopmentLoginTokens(host, port, connectionParameters.WorkerType, pit);
+                    var pit = GetDevelopmentPlayerIdentityToken(host, port, useInsecureConnection, authToken, playerId, displayName);
+                    var loginTokens = GetDevelopmentLoginTokens(host, port, useInsecureConnection, connectionParameters.WorkerType, pit);
                     var loginToken = loginTokens.First().LoginToken;
 
                     var locatorParameters = new LocatorParameters
@@ -117,7 +117,7 @@ namespace Improbable.Stdlib
                             LoginToken = loginToken,
                             PlayerIdentityToken = pit
                         },
-                        UseInsecureConnection = false,
+                        UseInsecureConnection = useInsecureConnection,
                         Logging = connectionParameters.ProtocolLogging,
                         EnableLogging = connectionParameters.EnableProtocolLoggingAtStartup
                     };
@@ -187,7 +187,7 @@ namespace Improbable.Stdlib
             metricsTcs = null;
         }
 
-        private static string GetDevelopmentPlayerIdentityToken(string host, ushort port, string authToken, string playerId, string displayName)
+        private static string GetDevelopmentPlayerIdentityToken(string host, ushort port, bool useInsecureConnection, string authToken, string playerId, string displayName)
         {
             using (var pit = DevelopmentAuthentication.CreateDevelopmentPlayerIdentityTokenAsync(
                 host, port,
@@ -196,7 +196,7 @@ namespace Improbable.Stdlib
                     DevelopmentAuthenticationToken = authToken,
                     PlayerId = playerId,
                     DisplayName = displayName,
-                    UseInsecureConnection = true
+                    UseInsecureConnection = useInsecureConnection
                 }))
             {
                 var value = pit.Get();
@@ -215,14 +215,14 @@ namespace Improbable.Stdlib
             }
         }
 
-        private static List<LoginTokenDetails> GetDevelopmentLoginTokens(string host, ushort port, string workerType, string pit)
+        private static List<LoginTokenDetails> GetDevelopmentLoginTokens(string host, ushort port, bool useInsecureConnection, string workerType, string pit)
         {
             using (var tokens = DevelopmentAuthentication.CreateDevelopmentLoginTokensAsync(host, port,
                 new LoginTokensRequest
                 {
                     PlayerIdentityToken = pit,
                     WorkerType = workerType,
-                    UseInsecureConnection = true
+                    UseInsecureConnection = useInsecureConnection,
                 }))
             {
                 var value = tokens.Get();
