@@ -60,7 +60,7 @@ namespace Improbable.Stdlib
 
                 case ILocatorOptions locatorOptions:
                     connectionParameters.Network.UseExternalIp = true;
-                    return ConnectAsync(locatorOptions.SpatialOsHost, locatorOptions.SpatialOsPort, connectionParameters, locatorOptions.Token, locatorOptions.PlayerId, locatorOptions.DisplayName, connectionParameters.WorkerType, taskOptions);
+                    return ConnectAsync(locatorOptions.SpatialOsHost, locatorOptions.SpatialOsPort, connectionParameters, locatorOptions.Token, locatorOptions.PlayerId, locatorOptions.DisplayName, taskOptions);
 
                 default:
                     throw new NotImplementedException("Unrecognized option type: " + workerOptions.GetType());
@@ -98,7 +98,7 @@ namespace Improbable.Stdlib
             return tcs.Task;
         }
 
-        public static Task<WorkerConnection> ConnectAsync(string host, ushort port, ConnectionParameters connectionParameters, string authToken, string playerId, string displayName, string workerType, TaskCreationOptions taskOptions = TaskCreationOptions.None)
+        public static Task<WorkerConnection> ConnectAsync(string host, ushort port, ConnectionParameters connectionParameters, string authToken, string playerId, string displayName, TaskCreationOptions taskOptions = TaskCreationOptions.None)
         {
             var tcs = new TaskCompletionSource<WorkerConnection>(taskOptions);
 
@@ -107,7 +107,7 @@ namespace Improbable.Stdlib
                 try
                 {
                     var pit = GetDevelopmentPlayerIdentityToken(host, port, authToken, playerId, displayName);
-                    var loginTokens = GetDevelopmentLoginTokens(host, port, workerType, pit);
+                    var loginTokens = GetDevelopmentLoginTokens(host, port, connectionParameters.WorkerType, pit);
                     var loginToken = loginTokens.First().LoginToken;
 
                     var locatorParameters = new LocatorParameters
@@ -117,7 +117,9 @@ namespace Improbable.Stdlib
                             LoginToken = loginToken,
                             PlayerIdentityToken = pit
                         },
-                        UseInsecureConnection = false
+                        UseInsecureConnection = false,
+                        Logging = connectionParameters.ProtocolLogging,
+                        EnableLogging = connectionParameters.EnableProtocolLoggingAtStartup
                     };
 
                     using (var locator = new Locator(host, locatorParameters))
@@ -199,7 +201,6 @@ namespace Improbable.Stdlib
             {
                 var value = pit.Get();
 
-
                 if (!value.HasValue)
                 {
                     throw new AuthenticationException("Error received while retrieving a Player Identity Token: null result");
@@ -211,7 +212,6 @@ namespace Improbable.Stdlib
                 }
 
                 return value.Value.PlayerIdentityToken;
-
             }
         }
 
@@ -243,7 +243,6 @@ namespace Improbable.Stdlib
                 }
 
                 return value.Value.LoginTokens;
-
             }
         }
 
