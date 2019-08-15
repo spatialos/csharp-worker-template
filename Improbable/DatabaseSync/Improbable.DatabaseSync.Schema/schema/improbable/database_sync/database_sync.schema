@@ -39,18 +39,6 @@ enum CommandErrors {
   DATABASE_OPERATION_FAILED = 1004;
 }
 
-component DatabaseSyncReference {
-    id = 1906;
-
-    string path = 1;
-}
-
-component AssociateDatabaseSync {
-    id = 1907;
-
-    int64 count = 1;
-}
-
 // DatabaseSyncItem is what is stored in the database.
 // Any changes to this type should also be reflected in DatabaseSyncGenerator.cs
 [improbable.postgres.CreateTableAttribute([
@@ -210,18 +198,6 @@ type DeleteResponse {
 
 type GetMetricsRequest {}
 
-type AssociatePathWithClientRequest {
-  // The path to the root item of the client items.
-  // Required; must not be empty.
-  string path = 1;
-
-  // The WorkerId associated with the path.
-  // Required; must not be empty.
-  string client_worker_id = 2;
-}
-
-type AssociatePathWithClientResponse {}
-
 // Only one of these fields can be set per request.
 // Requests with more than one set will be rejected.
 type CompositeRequest {
@@ -299,11 +275,6 @@ component DatabaseSyncService {
   // In the case of command failure, the error message will be a comma-separated list of error codes,
   // corresponding to the request's actions, in order.
   command BatchOperationResponse batch (BatchOperationRequest);
-
-  // Associates a WorkerId with a specific profile path.
-  // Can be called multiple times for the same profile path.
-  // Requires write authorization.
-  command AssociatePathWithClientResponse associate_path_with_client (AssociatePathWithClientRequest);
 
   command GetMetricsResponse get_metrics (GetMetricsRequest);
 
