@@ -22,7 +22,6 @@ namespace Improbable.Stdlib
         private Task metricsTask;
         private CancellationTokenSource metricsTcs = new CancellationTokenSource();
         private string workerId;
-
         private WorkerConnection(Connection connection)
         {
             this.connection = connection ?? throw new ArgumentNullException(nameof(connection));
@@ -61,7 +60,7 @@ namespace Improbable.Stdlib
 
                 case ILocatorOptions locatorOptions:
                     connectionParameters.Network.UseExternalIp = true;
-                    return ConnectAsync(locatorOptions.SpatialOsHost, locatorOptions.SpatialOsPort, connectionParameters, locatorOptions.Token, "Player", "", connectionParameters.WorkerType, taskOptions);
+                    return ConnectAsync(locatorOptions.SpatialOsHost, locatorOptions.SpatialOsPort, connectionParameters, locatorOptions.Token, locatorOptions.PlayerId, locatorOptions.DisplayName, connectionParameters.WorkerType, taskOptions);
 
                 default:
                     throw new NotImplementedException("Unrecognized option type: " + workerOptions.GetType());
@@ -188,43 +187,64 @@ namespace Improbable.Stdlib
 
         private static string GetDevelopmentPlayerIdentityToken(string host, ushort port, string authToken, string playerId, string displayName)
         {
-            var pit = DevelopmentAuthentication.CreateDevelopmentPlayerIdentityTokenAsync(
+            using (var pit = DevelopmentAuthentication.CreateDevelopmentPlayerIdentityTokenAsync(
                 host, port,
                 new PlayerIdentityTokenRequest
                 {
                     DevelopmentAuthenticationToken = authToken,
                     PlayerId = playerId,
-                    DisplayName = displayName
-                }).Get();
-
-            if (pit.Value.Status.Code != ConnectionStatusCode.Success)
+                    DisplayName = displayName,
+                    UseInsecureConnection = true
+                }))
             {
-                throw new AuthenticationException("Error received while retrieving a Player Identity Token: " + $"{pit.Value.Status.Detail}");
-            }
+                var value = pit.Get();
 
-            return pit.Value.PlayerIdentityToken;
+
+                if (!value.HasValue)
+                {
+                    throw new AuthenticationException("Error received while retrieving a Player Identity Token: null result");
+                }
+
+                if (value.Value.Status.Code != ConnectionStatusCode.Success)
+                {
+                    throw new AuthenticationException($"Error received while retrieving a Player Identity Token: {value.Value.Status.Detail}");
+                }
+
+                return value.Value.PlayerIdentityToken;
+
+            }
         }
 
         private static List<LoginTokenDetails> GetDevelopmentLoginTokens(string host, ushort port, string workerType, string pit)
         {
-            var tokens = DevelopmentAuthentication.CreateDevelopmentLoginTokensAsync(host, port,
+            using (var tokens = DevelopmentAuthentication.CreateDevelopmentLoginTokensAsync(host, port,
                 new LoginTokensRequest
                 {
                     PlayerIdentityToken = pit,
-                    WorkerType = workerType
-                }).Get();
-
-            if (tokens.Value.Status.Code != ConnectionStatusCode.Success)
+                    WorkerType = workerType,
+                    UseInsecureConnection = true
+                }))
             {
-                throw new AuthenticationException("Error received while retrieving Login Tokens: " + $"{tokens.Value.Status.Detail}");
-            }
+                var value = tokens.Get();
 
-            if (tokens.Value.LoginTokens.Count == 0)
-            {
-                throw new Exception("No deployment returned for this project.");
-            }
+                if (!value.HasValue)
+                {
+                    throw new AuthenticationException("Error received while retrieving Login Tokens: null result" );
+                }
 
-            return tokens.Value.LoginTokens;
+                if (value.Value.Status.Code != ConnectionStatusCode.Success)
+                {
+                    throw new AuthenticationException($"Error received while retrieving Login Tokens: {value.Value.Status.Detail}");
+                }
+
+                if (value.Value.LoginTokens.Count == 0)
+                {
+                    throw new Exception("No deployment returned for this project.");
+                }
+
+                return value.Value.LoginTokens;
+
+            }
         }
 
         public void ProcessOpList(OpList opList)
