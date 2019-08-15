@@ -122,7 +122,7 @@ namespace Improbable.Stdlib
                         EnableLogging = connectionParameters.EnableProtocolLoggingAtStartup
                     };
 
-                    using (var locator = new Locator(host, locatorParameters))
+                    using (var locator = new Locator(host, port, locatorParameters))
                     using (var future = locator.ConnectAsync(connectionParameters))
                     {
                         var connection = future.Get();
