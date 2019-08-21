@@ -163,12 +163,6 @@ type SetParentResponse {
     int64 item_count = 2;
 }
 
-type GetMetricsResponse {
-    map<uint32, int64> command_requests = 1;
-    map<string, int64> queries = 2;
-    map<string, int64> database = 3;
-}
-
 type CreateRequest {
   // The new item to create.
   // The 'path' field is required, and must not be empty.
@@ -195,8 +189,6 @@ type DeleteResponse {
   // The total number of items deleted.
   int64 item_count = 1;
 }
-
-type GetMetricsRequest {}
 
 // Only one of these fields can be set per request.
 // Requests with more than one set will be rejected.
@@ -275,8 +267,6 @@ component DatabaseSyncService {
   // In the case of command failure, the error message will be a comma-separated list of error codes,
   // corresponding to the request's actions, in order.
   command BatchOperationResponse batch (BatchOperationRequest);
-
-  command GetMetricsResponse get_metrics (GetMetricsRequest);
 
   // This is a list of worker types that are allowed to execute any commands that require
   // write authorization.  
