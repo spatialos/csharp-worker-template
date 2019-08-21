@@ -278,10 +278,9 @@ component DatabaseSyncService {
 
   command GetMetricsResponse get_metrics (GetMetricsRequest);
 
-  // This is a list of worker attributes that are allowed to execute any commands that require
-  // write authorization.
-  // See https://docs.improbable.io/reference/13.8/shared/worker-configuration/attributes#worker-attribute-set for more details.
-  list<string> write_worker_attributes = 1;
+  // This is a list of worker types that are allowed to execute any commands that require
+  // write authorization.  
+  list<string> write_worker_types = 1;
 
   // This event is periodically triggered to notify interested workers of paths that have changed.
   event PathsUpdated paths_updated;
