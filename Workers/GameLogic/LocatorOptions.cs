@@ -13,9 +13,10 @@ namespace GameLogic
         public IEnumerable<string> UnknownPositionalArguments { get; set; }
         public string SpatialOsHost { get; set; }
         public ushort SpatialOsPort { get; set; }
+        public bool UseInsecureConnection { get; set; }
+        public string DevToken { get; set; }
         public string Token { get; set; }
         public string DisplayName { get; set; }
         public string PlayerId { get; set; }
-        public string DeploymentName { get; set; }
     }
 }
