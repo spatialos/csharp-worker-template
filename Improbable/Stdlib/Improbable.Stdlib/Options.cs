@@ -34,7 +34,7 @@ namespace Improbable.Stdlib
         [Option("spatialos-use-insecure-connection")]
         bool UseInsecureConnection { get; set; }
 
-        [Option("dev-token", Required = true, HelpText = "Your Development Auth Token. For more information: \n " +
+        [Option("dev-token", HelpText = "Your Development Auth Token. For more information: \n " +
                                                      "https://docs.improbable.io/reference/13.8/shared/auth/development-authentication#create-a-developmentauthenticationtoken")]
         string DevToken { get; set; }
 
