@@ -16,6 +16,9 @@ using Newtonsoft.Json.Linq;
 
 namespace Improbable.Stdlib.Platform
 {
+    /// <summary>
+    /// This is an incomplete API. Functionality will be added as needed.
+    /// </summary>
     public static class Platform
     {
         public static string ToolbeltConfigDir =>
