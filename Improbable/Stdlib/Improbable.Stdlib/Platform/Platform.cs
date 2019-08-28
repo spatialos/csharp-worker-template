@@ -1,12 +1,14 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
+using Google.Api.Gax;
 using Google.Api.Gax.Grpc;
-using Google.Protobuf.Collections;
 using Google.Protobuf.WellKnownTypes;
 using Improbable.SpatialOS.Deployment.V1Alpha1;
 using Improbable.SpatialOS.Platform.Common;
@@ -21,10 +23,12 @@ namespace Improbable.Stdlib.Platform
     /// </summary>
     public static class Platform
     {
-        public static string ToolbeltConfigDir =>
+        private static string ToolbeltConfigDir =>
             Environment.GetEnvironmentVariable("IMPROBABLE_CONFIG_DIR") ?? (RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
                 ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), ".improbable")
                 : Path.Combine(Environment.GetEnvironmentVariable("HOME"), ".improbable"));
+
+        private static readonly PollSettings defaultPoll = new PollSettings(Expiration.FromTimeout(TimeSpan.FromMinutes(2)), TimeSpan.FromMilliseconds(100));
 
         private static PlatformCredential GetCredentials()
         {
@@ -37,11 +41,12 @@ namespace Improbable.Stdlib.Platform
             return new PlatformApiChannel(GetCredentials(), new PlatformApiEndpoint("localhost", 9876, true));
         }
 
-        public static Deployment StartLocal(in StartDeploymentOptions startDeployment)
+        public static async Task<Deployment> StartLocalAsync(StartDeploymentOptions startDeployment, CancellationToken cancellation = default, IProgress<string> progress = null)
         {
             var client = DeploymentServiceClient.Create(GetLocalApiChannel());
 
-            Shell.Run("spatial", "auth", "login", "--json_output");
+            progress?.Report("Logging in...");
+            Shell.Run("spatial", progress, "auth", "login", "--json_output");
 
             // The runtime creates a '.improbable' folder next to the spatialos.json file.
             var rootDir = Path.GetDirectoryName(startDeployment.ProjectConfigPath);
@@ -49,9 +54,10 @@ namespace Improbable.Stdlib.Platform
 
             Directory.CreateDirectory(tempDir);
 
+            progress?.Report("Converting launch config...");
             var splConfigPath = Path.Combine(tempDir, "spl_config.json");
             Shell.Run(
-                "spatial", "alpha", "config", "convert", "--json_output", "--launch_config", Shell.Escape(startDeployment.LaunchConfigPath),
+                "spatial", progress, "alpha", "config", "convert", "--json_output", "--launch_config", Shell.Escape(startDeployment.LaunchConfigPath),
                 "--main_config", Shell.Escape(startDeployment.ProjectConfigPath), "--output_path", splConfigPath);
 
             var project = JsonConvert.DeserializeObject<ProjectConfig>(File.ReadAllText(startDeployment.ProjectConfigPath, Encoding.UTF8));
@@ -79,26 +85,18 @@ namespace Improbable.Stdlib.Platform
 
             if (needsStart)
             {
-                Shell.Run("spatial", "service", "start", "--json_output", "--main_config", Shell.Escape(startDeployment.ProjectConfigPath));
+                progress?.Report("Starting Spatial service...");
+                Shell.Run("spatial", progress, "service", "start", "--json_output", "--main_config", Shell.Escape(startDeployment.ProjectConfigPath));
             }
 
-            using (var tcs = new CancellationTokenSource(5000))
-            {
-                var timeout = CallSettings.FromCancellationToken(tcs.Token);
-                var deployments = client.ListDeployments(new ListDeploymentsRequest
-                { DeploymentName = "local", ProjectName = project.ProjectName }, timeout);
+            await StopLocalAsync(startDeployment.ProjectConfig, cancellation, progress);
 
-                foreach (var dpl in deployments.Where(dpl => dpl.Status == Deployment.Types.Status.Running))
-                {
-                    client.DeleteDeployment(new DeleteDeploymentRequest { Id = dpl.Id });
-                }
-            }
-
+            progress?.Report("Starting local deployment...");
             var response = client.CreateDeployment(new CreateDeploymentRequest
             {
                 Deployment = new Deployment
                 {
-                    Tag = { startDeployment.Tags },
+                    Tag = {startDeployment.Tags},
                     Name = "local",
                     StartingSnapshotId = startDeployment.SnapshotId,
                     ProjectName = project.ProjectName,
@@ -107,65 +105,66 @@ namespace Improbable.Stdlib.Platform
                         ConfigJson = File.ReadAllText(splConfigPath)
                     }
                 }
-            }).PollUntilCompleted().Result;
+            }, CallSettings.FromCancellationToken(cancellation)).PollUntilCompleted(defaultPoll);
 
             // Apply desired starting worker flags.
             if (startDeployment.WorkerFlags.Any())
             {
-                var allWorkerFlags = new RepeatedField<WorkerFlag>();
+                var updatedFields = new Deployment
+                {
+                    Name = response.Result.Name,
+                    ProjectName = project.ProjectName,
+                    Id = response.Result.Id,
+                    WorkerFlags = { response.Result.WorkerFlags.Union(startDeployment.WorkerFlags.AsPlatformFlags()) }
+                };
 
-                var startFlags = startDeployment.WorkerFlags.SelectMany(wf =>
-                    wf.Flags.Select(f => new WorkerFlag { Key = f.Name, Value = f.Value, WorkerType = wf.WorkerType }));
-
-                allWorkerFlags.Add(startFlags);
-
-                var updatedFields = new Deployment { Name = response.Name, ProjectName = project.ProjectName, Id = response.Id, WorkerFlags = { allWorkerFlags } };
-                client.UpdateDeployment(new UpdateDeploymentRequest { Deployment = updatedFields, UpdateMask = new FieldMask { Paths = { "worker_flags" } } });
+                progress?.Report("Applying worker flags...");
+                await client.UpdateDeploymentAsync(new UpdateDeploymentRequest { Deployment = updatedFields, UpdateMask = new FieldMask { Paths = { "worker_flags" } } }, cancellation);
             }
 
-            return response;
+            return response.Result;
         }
 
-        public static void Stop(in ProjectConfig config)
+        public static async Task StopLocalAsync(ProjectConfig config, CancellationToken cancellation = default, IProgress<string> progress = null)
         {
-            using (var tcs = new CancellationTokenSource(5000))
+            var client = DeploymentServiceClient.Create(GetLocalApiChannel());
+
+            var deployments = await client.ListDeploymentsAsync(new ListDeploymentsRequest
             {
-                var client = DeploymentServiceClient.Create(GetLocalApiChannel());
+                DeploymentName = "local",
+                ProjectName = config.ProjectName,
+                DeploymentStoppedStatusFilter = ListDeploymentsRequest.Types.DeploymentStoppedStatusFilter.NotStoppedDeployments
+            }, CallSettings.FromCancellationToken(cancellation)).ReadPageAsync(50, cancellation);
 
-                var timeout = CallSettings.FromCancellationToken(tcs.Token);
-                var deployments = client.ListDeployments(new ListDeploymentsRequest
-                { DeploymentName = "local", ProjectName = config.ProjectName }, timeout);
-
-                foreach (var dpl in deployments.Where(dpl =>
-                    dpl.Status == Deployment.Types.Status.Running))
-                {
-                    client.DeleteDeployment(new DeleteDeploymentRequest { Id = dpl.Id });
-                }
+            var tasks = new List<Task>();
+            foreach (var dpl in deployments)
+            {
+                progress.Report($"Stopping {dpl.Id}...");
+                tasks.Add(client.DeleteDeploymentAsync(new DeleteDeploymentRequest { Id = dpl.Id }, CallSettings.FromCancellationToken(cancellation)));
             }
+
+            Task.WaitAll(tasks.ToArray(), cancellation);
         }
 
-        public static string CreateDevAuthToken(in ProjectConfig config)
+
+        public static async Task<string> CreateDevAuthTokenAsync(ProjectConfig config, CancellationToken cancellation = default)
         {
-            using (var tcs = new CancellationTokenSource(5000))
+            var authClient = PlayerAuthServiceClient.Create(credentials: GetCredentials());
+
+            var token = await authClient.CreateDevelopmentAuthenticationTokenAsync(new CreateDevelopmentAuthenticationTokenRequest
             {
-                var timeout = CallSettings.FromCancellationToken(tcs.Token);
-                var authClient = PlayerAuthServiceClient.Create(credentials: GetCredentials());
+                Description = config.ProjectName,
+                Lifetime = Duration.FromTimeSpan(TimeSpan.FromMinutes(30)),
+                ProjectName = config.ProjectName
+            }, CallSettings.FromCancellationToken(cancellation));
 
-                var token = authClient.CreateDevelopmentAuthenticationToken(new CreateDevelopmentAuthenticationTokenRequest
-                {
-                    Description = config.ProjectName,
-                    Lifetime = Duration.FromTimeSpan(TimeSpan.FromMinutes(30)),
-                    ProjectName = config.ProjectName
-                }, timeout);
-
-                return token.TokenSecret;
-            }
+            return token.TokenSecret;
         }
 
         // Hide this away until we don't need to call out to spatial any more.
         private static class Shell
         {
-            public static void Run(string command, params string[] args)
+            public static void Run(string command, IProgress<string> progress, params string[] args)
             {
                 var processStartInfo = new ProcessStartInfo(command, string.Join(" ", args))
                 {
@@ -176,8 +175,6 @@ namespace Improbable.Stdlib.Platform
                 };
 
                 var process = Process.Start(processStartInfo);
-                var stdout = new StringBuilder();
-                var stderr = new StringBuilder();
 
                 if (process == null)
                 {
@@ -192,11 +189,11 @@ namespace Improbable.Stdlib.Platform
 
                         if (obj.TryGetValue("msg", out var msgValue))
                         {
-                            stdout.AppendLine(msgValue.Value<string>());
+                            progress?.Report(msgValue.Value<string>());
                         }
                         else
                         {
-                            stdout.AppendLine(eventArgs.Data);
+                            progress?.Report(eventArgs.Data);
                         }
                     }
                 };
@@ -209,11 +206,11 @@ namespace Improbable.Stdlib.Platform
 
                         if (obj.TryGetValue("msg", out var msgValue))
                         {
-                            stderr.AppendLine(msgValue.Value<string>());
+                            progress?.Report(msgValue.Value<string>());
                         }
                         else
                         {
-                            stderr.AppendLine(eventArgs.Data);
+                            progress?.Report(eventArgs.Data);
                         }
                     }
                 };
@@ -226,7 +223,7 @@ namespace Improbable.Stdlib.Platform
 
                 if (process.ExitCode != 0)
                 {
-                    throw new Exception($"ExitCode {process.ExitCode}: {processStartInfo.FileName} {processStartInfo.Arguments}\n{stdout}\n{stderr}");
+                    throw new Exception($"ExitCode {process.ExitCode}: {processStartInfo.FileName} {processStartInfo.Arguments}");
                 }
             }
 
