@@ -229,7 +229,7 @@ namespace Improbable.Stdlib
 
                 if (!value.HasValue)
                 {
-                    throw new AuthenticationException("Error received while retrieving Login Tokens: null result" );
+                    throw new AuthenticationException("Error received while retrieving Login Tokens: null result");
                 }
 
                 if (value.Value.Status.Code != ConnectionStatusCode.Success)
@@ -279,7 +279,7 @@ namespace Improbable.Stdlib
                 requestId = connection.SendCommandRequest(entityId.Value, new CommandRequest(request), 1, timeout, parameters);
             }
 
-            if (!requestsToComplete.TryAdd(requestId, new TaskHandler {Cancel = cancel, Complete = complete, Fail = fail}))
+            if (!requestsToComplete.TryAdd(requestId, new TaskHandler { Cancel = cancel, Complete = complete, Fail = fail }))
             {
                 throw new InvalidOperationException("Key already exists");
             }
@@ -363,7 +363,7 @@ namespace Improbable.Stdlib
                 cancellation.Dispose();
             }
 
-            if (!requestsToComplete.TryAdd(id, new TaskHandler {Cancel = Cancel, Complete = Complete, Fail = Fail}))
+            if (!requestsToComplete.TryAdd(id, new TaskHandler { Cancel = Cancel, Complete = Complete, Fail = Fail }))
             {
                 throw new InvalidOperationException("Key already exists");
             }
@@ -378,7 +378,7 @@ namespace Improbable.Stdlib
                 switch (r.StatusCode)
                 {
                     case StatusCode.Success:
-                        completer.Complete(new CommandResponses {ReserveEntityIds = r});
+                        completer.Complete(new CommandResponses { ReserveEntityIds = r });
                         break;
                     default:
                         completer.Fail(r.StatusCode, r.Message);
@@ -394,7 +394,7 @@ namespace Improbable.Stdlib
                 switch (r.StatusCode)
                 {
                     case StatusCode.Success:
-                        completer.Complete(new CommandResponses {EntityQuery = r});
+                        completer.Complete(new CommandResponses { EntityQuery = r });
                         break;
                     default:
                         completer.Fail(r.StatusCode, r.Message);
@@ -415,7 +415,7 @@ namespace Improbable.Stdlib
                             throw new ArgumentNullException();
                         }
 
-                        completer.Complete(new CommandResponses {UserCommand = r});
+                        completer.Complete(new CommandResponses { UserCommand = r });
                         break;
                     default:
                         completer.Fail(r.StatusCode, r.Message);
@@ -431,7 +431,7 @@ namespace Improbable.Stdlib
                 switch (r.StatusCode)
                 {
                     case StatusCode.Success:
-                        completer.Complete(new CommandResponses {CreateEntity = r});
+                        completer.Complete(new CommandResponses { CreateEntity = r });
                         break;
                     default:
                         completer.Fail(r.StatusCode, r.Message);
@@ -447,7 +447,7 @@ namespace Improbable.Stdlib
                 switch (r.StatusCode)
                 {
                     case StatusCode.Success:
-                        completer.Complete(new CommandResponses {DeleteEntity = r});
+                        completer.Complete(new CommandResponses { DeleteEntity = r });
                         break;
                     default:
                         completer.Fail(r.StatusCode, r.Message);

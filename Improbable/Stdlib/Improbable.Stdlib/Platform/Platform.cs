@@ -83,7 +83,7 @@ namespace Improbable.Stdlib.Platform
             {
                 var timeout = CallSettings.FromCancellationToken(tcs.Token);
                 var deployments = client.ListDeployments(new ListDeploymentsRequest
-                    { DeploymentName = "local", ProjectName = project.ProjectName }, timeout);
+                { DeploymentName = "local", ProjectName = project.ProjectName }, timeout);
 
                 foreach (var dpl in deployments.Where(dpl => dpl.Status == Deployment.Types.Status.Running))
                 {
@@ -116,8 +116,8 @@ namespace Improbable.Stdlib.Platform
 
                 allWorkerFlags.Add(startFlags);
 
-                var updatedFields = new Deployment{ Name= response.Name, ProjectName = project.ProjectName, Id = response.Id, WorkerFlags = { allWorkerFlags } };
-                client.UpdateDeployment(new UpdateDeploymentRequest { Deployment = updatedFields, UpdateMask = new FieldMask {Paths = { "worker_flags"}}});
+                var updatedFields = new Deployment { Name = response.Name, ProjectName = project.ProjectName, Id = response.Id, WorkerFlags = { allWorkerFlags } };
+                client.UpdateDeployment(new UpdateDeploymentRequest { Deployment = updatedFields, UpdateMask = new FieldMask { Paths = { "worker_flags" } } });
             }
 
             return response;
@@ -131,7 +131,7 @@ namespace Improbable.Stdlib.Platform
 
                 var timeout = CallSettings.FromCancellationToken(tcs.Token);
                 var deployments = client.ListDeployments(new ListDeploymentsRequest
-                    { DeploymentName = "local", ProjectName = config.ProjectName }, timeout);
+                { DeploymentName = "local", ProjectName = config.ProjectName }, timeout);
 
                 foreach (var dpl in deployments.Where(dpl =>
                     dpl.Status == Deployment.Types.Status.Running))
@@ -160,7 +160,7 @@ namespace Improbable.Stdlib.Platform
         }
 
         // Hide this away until we don't need to call out to spatial any more.
-       private static class Shell
+        private static class Shell
         {
             public static void Run(string command, params string[] args)
             {
@@ -171,7 +171,7 @@ namespace Improbable.Stdlib.Platform
                     RedirectStandardError = true,
                     RedirectStandardOutput = true
                 };
-                
+
                 var process = Process.Start(processStartInfo);
                 var stdout = new StringBuilder();
                 var stderr = new StringBuilder();

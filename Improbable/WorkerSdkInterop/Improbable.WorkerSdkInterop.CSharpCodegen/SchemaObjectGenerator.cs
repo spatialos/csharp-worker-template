@@ -851,7 +851,7 @@ public static bool TryGetEvents({SchemaComponentUpdate} update{parameters})
     return {string.Join($"{Indent(2, "&& ")}\n", events.Select(evt => $"!{FieldNameToSafeName(SnakeCaseToCamelCase(evt.Name))}.IsDefaultOrEmpty"))};
 }}";
         }
-        
+
         private string GenerateUpdateStruct(TypeDescription type, IReadOnlyList<FieldDefinition> fields)
         {
             var fieldText = new StringBuilder();
