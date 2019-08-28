@@ -269,15 +269,12 @@ namespace Improbable.Stdlib
                         break;
                 }
             }
-
-            if (GetConnectionStatusCode() != ConnectionStatusCode.Success)
-            {
-                CancelCommands();
-            }
         }
 
         public void Send(EntityId entityId, SchemaCommandRequest request, uint? timeout, CommandParameters? parameters, Action<CommandResponses> complete, Action<StatusCode, string> fail, Action cancel)
         {
+            ThrowCommandFailedIfNotConnected();
+
             uint requestId;
             lock (connection)
             {
@@ -307,6 +304,8 @@ namespace Improbable.Stdlib
 
         public Task<ReserveEntityIdsResult> SendReserveEntityIdsRequest(uint numberOfEntityIds, uint? timeoutMillis = null)
         {
+            ThrowCommandFailedIfNotConnected();
+
             lock (connection)
             {
                 return RecordTask(connection.SendReserveEntityIdsRequest(numberOfEntityIds, timeoutMillis), responses => new ReserveEntityIdsResult
@@ -319,6 +318,8 @@ namespace Improbable.Stdlib
 
         public Task<EntityId?> SendCreateEntityRequest(Entity entity, EntityId? entityId = null, uint? timeoutMillis = null)
         {
+            ThrowCommandFailedIfNotConnected();
+
             lock (connection)
             {
                 return RecordTask(connection.SendCreateEntityRequest(entity, entityId?.Value, timeoutMillis), responses => responses.CreateEntity.EntityId.HasValue ? new EntityId(responses.CreateEntity.EntityId.Value) : (EntityId?) null);
@@ -327,6 +328,8 @@ namespace Improbable.Stdlib
 
         public Task<EntityId> SendDeleteEntityRequest(EntityId entityId, uint? timeoutMillis = null)
         {
+            ThrowCommandFailedIfNotConnected();
+
             lock (connection)
             {
                 return RecordTask(connection.SendDeleteEntityRequest(entityId.Value, timeoutMillis), responses => new EntityId(responses.DeleteEntity.EntityId));
@@ -335,6 +338,8 @@ namespace Improbable.Stdlib
 
         public Task<EntityQueryResult> SendEntityQueryRequest(EntityQuery entityQuery, uint? timeoutMillis = null)
         {
+            ThrowCommandFailedIfNotConnected();
+
             lock (connection)
             {
                 return RecordTask(connection.SendEntityQueryRequest(entityQuery, timeoutMillis), responses => new EntityQueryResult
@@ -463,6 +468,11 @@ namespace Improbable.Stdlib
 
         public void SendCommandResponse(uint id, SchemaCommandResponse response)
         {
+            if (GetConnectionStatusCode() != ConnectionStatusCode.Success)
+            {
+                throw new Exception("Not connected to SpatialOS");
+            }
+
             lock (connection)
             {
                 connection.SendCommandResponse(id, new CommandResponse(response));
@@ -471,6 +481,11 @@ namespace Improbable.Stdlib
 
         public void SendCommandFailure(uint requestId, string message)
         {
+            if (GetConnectionStatusCode() != ConnectionStatusCode.Success)
+            {
+                throw new Exception("Not connected to SpatialOS");
+            }
+
             lock (connection)
             {
                 connection.SendCommandFailure(requestId, message);
@@ -479,6 +494,11 @@ namespace Improbable.Stdlib
 
         public void SendComponentUpdate(EntityId entityId, SchemaComponentUpdate update, UpdateParameters? updateParameters = null)
         {
+            if (GetConnectionStatusCode() != ConnectionStatusCode.Success)
+            {
+                throw new Exception("Not connected to SpatialOS");
+            }
+
             lock (connection)
             {
                 connection.SendComponentUpdate(entityId.Value, new ComponentUpdate(update), updateParameters);
@@ -487,6 +507,11 @@ namespace Improbable.Stdlib
 
         public void SendMetrics(Metrics metrics)
         {
+            if (GetConnectionStatusCode() != ConnectionStatusCode.Success)
+            {
+                throw new Exception("Not connected to SpatialOS");
+            }
+
             lock (connection)
             {
                 connection.SendMetrics(metrics);
@@ -510,6 +535,11 @@ namespace Improbable.Stdlib
         {
             if (connection == null || GetConnectionStatusCode() != ConnectionStatusCode.Success)
             {
+                if (GetConnectionStatusCode() != ConnectionStatusCode.Success)
+                {
+                    CancelCommands();
+                }
+
                 return EmptyOpList;
             }
 
@@ -545,15 +575,33 @@ namespace Improbable.Stdlib
                 finally
                 {
                     opList?.Dispose();
+
+                    if (GetConnectionStatusCode() != ConnectionStatusCode.Success)
+                    {
+                        CancelCommands();
+                    }
                 }
             }
         }
 
         public string GetWorkerFlag(string flagName)
         {
+            if (GetConnectionStatusCode() != ConnectionStatusCode.Success)
+            {
+                throw new Exception("Not connected to SpatialOS");
+            }
+
             lock (connection)
             {
                 return connection.GetWorkerFlag(flagName);
+            }
+        }
+
+        private void ThrowCommandFailedIfNotConnected()
+        {
+            if (GetConnectionStatusCode() != ConnectionStatusCode.Success)
+            {
+                throw new CommandFailedException(StatusCode.Timeout, "Not connected to SpatialOS");
             }
         }
 
