@@ -98,7 +98,7 @@ namespace Improbable.Stdlib
             return tcs.Task;
         }
 
-        public static Task<WorkerConnection> ConnectAsync(ILocatorOptions options, ConnectionParameters connectionParameters, TaskCreationOptions taskOptions = TaskCreationOptions.None)
+        private static Task<WorkerConnection> ConnectAsync(ILocatorOptions options, ConnectionParameters connectionParameters, TaskCreationOptions taskOptions = TaskCreationOptions.None)
         {
             var tcs = new TaskCompletionSource<WorkerConnection>(taskOptions);
 
@@ -268,6 +268,11 @@ namespace Improbable.Stdlib
                         CompleteCommand(op.CommandResponseOp);
                         break;
                 }
+            }
+
+            if (GetConnectionStatusCode() != ConnectionStatusCode.Success)
+            {
+                CancelCommands();
             }
         }
 
@@ -519,22 +524,10 @@ namespace Improbable.Stdlib
         /// </summary>
         /// <param name="timeout">
         ///     An empty OpList will be returned after the specified duration. Use <see cref="TimeSpan.Zero" />
-        ///     to block.
-        /// </param>
-        public IEnumerable<OpList> GetOpLists(TimeSpan timeout)
-        {
-            return GetOpLists(timeout, CancellationToken.None);
-        }
-
-        /// <summary>
-        ///     Returns OpLists for as long as connected to SpatialOS.
-        /// </summary>
-        /// <param name="timeout">
-        ///     An empty OpList will be returned after the specified duration. Use <see cref="TimeSpan.Zero" />
         ///     to block until new ops are available.
         /// </param>
         /// <param name="token">Cancellation token.</param>
-        public IEnumerable<OpList> GetOpLists(TimeSpan timeout, CancellationToken token)
+        public IEnumerable<OpList> GetOpLists(TimeSpan timeout, CancellationToken token = default)
         {
             while (!token.IsCancellationRequested && connection != null && GetConnectionStatusCode() == ConnectionStatusCode.Success)
             {
