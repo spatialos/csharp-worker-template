@@ -23,7 +23,7 @@ There are also a few helpers available:
 
 * `Improbable.Stdlib.ComponentCollection` is a thread-safe view of the worker's checked out entity components.
 * `Improbable.Stdlib.WorkerConnection` is a thread-safe wrapper around the low-level SpatialOS `Connection` object. It enables the use of `async/await` constructs when sending SpatialOS command requests.
-* `Improbable.Stdlib.OpList` is a wrapper around the low-level SpatialOS `OpList`. It enables the construction of LINQ queries, and include op-specific helpers like `OfOpType<>` and `OfComponent`.
+* `Improbable.Stdlib.OpList` is a wrapper around the low-level SpatialOS `OpList`. It enables the construction of LINQ queries, and includes op-specific helpers like `OfOpType<>` and `OfComponent`.
 
 ## Machine setup
 
@@ -70,13 +70,14 @@ To point the code generator to your project's schema, do the following:
 ```
 <SchemaInputDir Include="$(SolutionDir)\..\SpatialOS\schema" />
 ```
-Note that depending on your target project, you may need more than one schema input directory. You may need to link to the standard schema library for example.
+Note that depending on your target project, you may need more than one schema input directory.
+You can specify multiple schema input directories by separating each one with a `;`.
 Once you've done this, you can delete the placeholder `schema` directory.
 
 
 ## Building the solution
 
-* Open the solution in JetBrains Rider, Visual Studio, Visual Studio Code and select and build the  `x64` platform.
+* Open the solution in JetBrains Rider, Visual Studio, or Visual Studio Code and select and build the  `x64` platform.
 * Or, build directly using `dotnet build Workers.sln -p:Platform=x64`.
 
 ## Running the worker
@@ -150,8 +151,7 @@ Process only component updates for a specific component:
 Each component that defines commands provides static methods of the form `Task<ResponseType> Send<CommandName>Async(WorkerConnection, RequestType, ...);`
 
 ```
-var children = await DatabaseSyncService.SendGetItemsAsync(connection, new GetItemsRequest(profileId, GetItemDepth.Recursive, connection.WorkerId))
-                    .ConfigureAwait(false);
+var children = await DatabaseSyncService.SendGetItemsAsync(connection, new GetItemsRequest(profileId, GetItemDepth.Recursive, connection.WorkerId));
 ```
 
 ### Respond to a command?
