@@ -91,7 +91,7 @@ namespace Improbable.Stdlib.Platform
 
             await StopLocalAsync(startDeployment.ProjectConfig, cancellation, progress);
 
-            progress?.Report("Starting local deployment...");
+            progress?.Report($"Starting local deployment for '{project.ProjectName}' with snapshot '{startDeployment.SnapshotId}'...");
             var response = client.CreateDeployment(new CreateDeploymentRequest
             {
                 Deployment = new Deployment
@@ -105,7 +105,13 @@ namespace Improbable.Stdlib.Platform
                         ConfigJson = File.ReadAllText(splConfigPath)
                     }
                 }
-            }, CallSettings.FromCancellationToken(cancellation)).PollUntilCompleted(defaultPoll);
+            }, CallSettings.FromCancellationToken(cancellation))
+                .PollUntilCompleted(defaultPoll);
+
+            if (response.IsFaulted)
+            {
+                throw response.Exception;
+            }
 
             // Apply desired starting worker flags.
             if (startDeployment.WorkerFlags.Any())
