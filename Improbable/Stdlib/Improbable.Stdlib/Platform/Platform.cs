@@ -88,6 +88,7 @@ namespace Improbable.Stdlib.Platform
                 progress?.Report("Starting Spatial service...");
                 Shell.Run("spatial", progress, "service", "start", "--json_output", "--main_config", Shell.Escape(startDeployment.ProjectConfigPath));
 
+                // Workaround until WF-1646 is fixed.
                 progress?.Report("Sleeping to let Spatial start up...");
                 await Task.Delay(TimeSpan.FromSeconds(1), cancellation);
             }
