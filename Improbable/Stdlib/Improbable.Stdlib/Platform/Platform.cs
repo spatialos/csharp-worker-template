@@ -89,7 +89,14 @@ namespace Improbable.Stdlib.Platform
                 Shell.Run("spatial", progress, "service", "start", "--json_output", "--main_config", Shell.Escape(startDeployment.ProjectConfigPath));
             }
 
+            // Shut down any currently-running local deployments...
             await StopLocalAsync(startDeployment.ProjectConfig, cancellation, progress);
+
+            var snapshotFile = Path.Combine(Path.GetDirectoryName(startDeployment.ProjectConfigPath), "snapshots", $"{startDeployment.SnapshotId}.snapshot");
+            if (!File.Exists(snapshotFile))
+            {
+                throw new FileNotFoundException(snapshotFile);
+            }
 
             progress?.Report($"Starting local deployment for '{project.ProjectName}' with snapshot '{startDeployment.SnapshotId}'...");
             var response = client.CreateDeployment(new CreateDeploymentRequest
@@ -125,7 +132,11 @@ namespace Improbable.Stdlib.Platform
                 };
 
                 progress?.Report("Applying worker flags...");
-                await client.UpdateDeploymentAsync(new UpdateDeploymentRequest { Deployment = updatedFields, UpdateMask = new FieldMask { Paths = { "worker_flags" } } }, cancellation);
+                await client.UpdateDeploymentAsync(new UpdateDeploymentRequest
+                {
+                    Deployment = updatedFields,
+                    UpdateMask = new FieldMask { Paths = { "worker_flags" } }
+                }, cancellation);
             }
 
             return response.Result;
