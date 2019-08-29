@@ -87,6 +87,9 @@ namespace Improbable.Stdlib.Platform
             {
                 progress?.Report("Starting Spatial service...");
                 Shell.Run("spatial", progress, "service", "start", "--json_output", "--main_config", Shell.Escape(startDeployment.ProjectConfigPath));
+
+                progress?.Report("Sleeping to let Spatial start up...");
+                await Task.Delay(TimeSpan.FromSeconds(1), cancellation);
             }
 
             // Shut down any currently-running local deployments...
