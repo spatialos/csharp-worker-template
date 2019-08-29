@@ -180,56 +180,57 @@ namespace Improbable.Stdlib.Platform
                     RedirectStandardOutput = true
                 };
 
-                var process = Process.Start(processStartInfo);
-
-                if (process == null)
+                using (var process = Process.Start(processStartInfo))
                 {
-                    throw new Exception($"Failed to start {command} {processStartInfo.Arguments}");
-                }
-
-                process.OutputDataReceived += (sender, eventArgs) =>
-                {
-                    if (!string.IsNullOrEmpty(eventArgs.Data))
+                    if (process == null)
                     {
-                        var obj = JObject.Parse(eventArgs.Data);
-
-                        if (obj.TryGetValue("msg", out var msgValue))
-                        {
-                            progress?.Report(msgValue.Value<string>());
-                        }
-                        else
-                        {
-                            progress?.Report(eventArgs.Data);
-                        }
+                        throw new Exception($"Failed to start {command} {processStartInfo.Arguments}");
                     }
-                };
 
-                process.ErrorDataReceived += (sender, eventArgs) =>
-                {
-                    if (!string.IsNullOrEmpty(eventArgs.Data))
+                    process.OutputDataReceived += (sender, eventArgs) =>
                     {
-                        var obj = JObject.Parse(eventArgs.Data);
+                        if (!string.IsNullOrEmpty(eventArgs.Data))
+                        {
+                            var obj = JObject.Parse(eventArgs.Data);
 
-                        if (obj.TryGetValue("msg", out var msgValue))
-                        {
-                            progress?.Report(msgValue.Value<string>());
+                            if (obj.TryGetValue("msg", out var msgValue))
+                            {
+                                progress?.Report(msgValue.Value<string>());
+                            }
+                            else
+                            {
+                                progress?.Report(eventArgs.Data);
+                            }
                         }
-                        else
+                    };
+
+                    process.ErrorDataReceived += (sender, eventArgs) =>
+                    {
+                        if (!string.IsNullOrEmpty(eventArgs.Data))
                         {
-                            progress?.Report(eventArgs.Data);
+                            var obj = JObject.Parse(eventArgs.Data);
+
+                            if (obj.TryGetValue("msg", out var msgValue))
+                            {
+                                progress?.Report(msgValue.Value<string>());
+                            }
+                            else
+                            {
+                                progress?.Report(eventArgs.Data);
+                            }
                         }
+                    };
+
+                    process.EnableRaisingEvents = true;
+                    process.BeginOutputReadLine();
+                    process.BeginErrorReadLine();
+
+                    process.WaitForExit();
+
+                    if (process.ExitCode != 0)
+                    {
+                        throw new Exception($"ExitCode {process.ExitCode}: {processStartInfo.FileName} {processStartInfo.Arguments}");
                     }
-                };
-
-                process.EnableRaisingEvents = true;
-                process.BeginOutputReadLine();
-                process.BeginErrorReadLine();
-
-                process.WaitForExit();
-
-                if (process.ExitCode != 0)
-                {
-                    throw new Exception($"ExitCode {process.ExitCode}: {processStartInfo.FileName} {processStartInfo.Arguments}");
                 }
             }
 
