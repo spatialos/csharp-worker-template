@@ -15,12 +15,14 @@ namespace Improbable.Test
             {
                 using (var tcs = new CancellationTokenSource(timeout ?? DefaultTimeout))
                 {
-                    while (!tcs.IsCancellationRequested)
+                    while (true)
                     {
                         if (components.Contains(entityId))
                         {
                             break;
                         }
+
+                        tcs.Token.ThrowIfCancellationRequested();
 
                         await Task.Delay(TimeSpan.FromMilliseconds(1), tcs.Token);
                     }
@@ -34,12 +36,14 @@ namespace Improbable.Test
             {
                 using (var tcs = new CancellationTokenSource(timeout ?? DefaultTimeout))
                 {
-                    while (!tcs.IsCancellationRequested)
+                    while (true)
                     {
                         if (components.Contains(entityId) && predicate(components.Get(entityId)))
                         {
                             break;
                         }
+
+                        tcs.Token.ThrowIfCancellationRequested();
 
                         await Task.Delay(TimeSpan.FromMilliseconds(1), tcs.Token);
                     }

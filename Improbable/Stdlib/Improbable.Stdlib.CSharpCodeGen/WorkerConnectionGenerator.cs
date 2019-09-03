@@ -83,12 +83,12 @@ public static global::System.Threading.Tasks.Task<{response}> Send{cmdName}Async
                                                                                  {CancellationTokenType} cancellation = default,
                                                                                  uint? timeout = null,
                                                                                  global::Improbable.Worker.CInterop.CommandParameters? parameters = null,
-                                                                                 global::System.Threading.Tasks.TaskCreationOptions options = global::System.Threading.Tasks.TaskCreationOptions.None)
+                                                                                 global::System.Threading.Tasks.TaskCreationOptions taskOptions = global::System.Threading.Tasks.TaskCreationOptions.RunContinuationsAsynchronously)
 {{
     var schemaRequest = new global::Improbable.Worker.CInterop.SchemaCommandRequest({componentName}.ComponentId, {cmd.CommandIndex});
     request.ApplyToSchemaObject(schemaRequest.GetObject());
 
-    var completion = new global::System.Threading.Tasks.TaskCompletionSource<{response}>(options);
+    var completion = new global::System.Threading.Tasks.TaskCompletionSource<{response}>(taskOptions);
     if (cancellation.CanBeCanceled)
     {{
         cancellation.Register(() => completion.TrySetCanceled(cancellation));
@@ -105,7 +105,7 @@ public static global::System.Threading.Tasks.Task<{response}> Send{cmdName}Async
         completion.TrySetException(new global::Improbable.Stdlib.CommandFailedException(code, message));
     }}
 
-    connection.Send(entityId, schemaRequest, timeout, cancellation, parameters, Complete, Fail);
+    connection.Send(entityId, schemaRequest, timeout, parameters, Complete, Fail);
 
     return completion.Task;
 }}");

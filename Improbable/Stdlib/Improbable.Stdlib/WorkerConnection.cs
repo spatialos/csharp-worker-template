@@ -22,6 +22,7 @@ namespace Improbable.Stdlib
         private Task metricsTask;
         private CancellationTokenSource metricsTcs = new CancellationTokenSource();
         private string workerId;
+
         private WorkerConnection(Connection connection)
         {
             this.connection = connection ?? throw new ArgumentNullException(nameof(connection));
@@ -44,31 +45,36 @@ namespace Improbable.Stdlib
         public void Dispose()
         {
             StopSendingMetrics();
+            CancelCommands();
 
             connection?.Dispose();
             connection = null;
         }
 
-        public static Task<WorkerConnection> ConnectAsync(IWorkerOptions workerOptions, ConnectionParameters connectionParameters, TaskCreationOptions taskOptions = TaskCreationOptions.None)
+        public static Task<WorkerConnection> ConnectAsync(IWorkerOptions workerOptions, ConnectionParameters connectionParameters, CancellationToken cancellation = default)
         {
             switch (workerOptions)
             {
                 case IReceptionistOptions receptionistOptions:
                     var workerName = workerOptions.WorkerName ?? $"{connectionParameters.WorkerType}-{Guid.NewGuid().ToString()}";
-                    return ConnectAsync(receptionistOptions.SpatialOsHost, receptionistOptions.SpatialOsPort, workerName, connectionParameters, taskOptions);
+                    return ConnectAsync(receptionistOptions.SpatialOsHost, receptionistOptions.SpatialOsPort, workerName, connectionParameters, cancellation);
 
                 case ILocatorOptions locatorOptions:
                     connectionParameters.Network.UseExternalIp = true;
-                    return ConnectAsync(locatorOptions, connectionParameters, taskOptions);
+                    return ConnectAsync(locatorOptions, connectionParameters, cancellation);
 
                 default:
                     throw new NotImplementedException("Unrecognized option type: " + workerOptions.GetType());
             }
         }
 
-        public static Task<WorkerConnection> ConnectAsync(string host, ushort port, string workerName, ConnectionParameters connectionParameters, TaskCreationOptions taskOptions = TaskCreationOptions.None)
+        public static Task<WorkerConnection> ConnectAsync(string host, ushort port, string workerName, ConnectionParameters connectionParameters, CancellationToken cancellation = default)
         {
-            var tcs = new TaskCompletionSource<WorkerConnection>(taskOptions);
+            var tcs = new TaskCompletionSource<WorkerConnection>();
+            if (cancellation.CanBeCanceled)
+            {
+                cancellation.Register(() => tcs.TrySetCanceled(cancellation));
+            }
 
             Task.Factory.StartNew(() =>
             {
@@ -76,7 +82,17 @@ namespace Improbable.Stdlib
                 {
                     using (var future = Connection.ConnectAsync(host, port, workerName, connectionParameters))
                     {
-                        var connection = future.Get();
+                        Connection connection;
+                        while (true)
+                        {
+                            cancellation.ThrowIfCancellationRequested();
+
+                            if (future.TryGet(out connection, 50))
+                            {
+                                break;
+                            }
+                        }
+
 
                         if (connection.GetConnectionStatusCode() != ConnectionStatusCode.Success)
                         {
@@ -90,16 +106,20 @@ namespace Improbable.Stdlib
                 }
                 catch (Exception e)
                 {
-                    tcs.SetException(e);
+                    tcs.TrySetException(e);
                 }
-            }, taskOptions);
+            }, cancellation);
 
             return tcs.Task;
         }
 
-        private static Task<WorkerConnection> ConnectAsync(ILocatorOptions options, ConnectionParameters connectionParameters, TaskCreationOptions taskOptions = TaskCreationOptions.None)
+        private static Task<WorkerConnection> ConnectAsync(ILocatorOptions options, ConnectionParameters connectionParameters, CancellationToken cancellation = default)
         {
-            var tcs = new TaskCompletionSource<WorkerConnection>(taskOptions);
+            var tcs = new TaskCompletionSource<WorkerConnection>();
+            if (cancellation.CanBeCanceled)
+            {
+                cancellation.Register(() => tcs.TrySetCanceled(cancellation));
+            }
 
             Task.Factory.StartNew(() =>
             {
@@ -124,9 +144,18 @@ namespace Improbable.Stdlib
                     using (var locator = new Locator(options.SpatialOsHost, options.SpatialOsPort, locatorParameters))
                     using (var future = locator.ConnectAsync(connectionParameters))
                     {
-                        var connection = future.Get();
+                        Connection connection;
+                        while (true)
+                        {
+                            cancellation.ThrowIfCancellationRequested();
 
-                        if (connection.GetConnectionStatusCode() != ConnectionStatusCode.Success)
+                            if (future.TryGet(out connection, 50))
+                            {
+                                break;
+                            }
+                        }
+
+                        if (connection != null && connection.GetConnectionStatusCode() != ConnectionStatusCode.Success)
                         {
                             tcs.SetException(new Exception($"{connection.GetConnectionStatusCode()}: {connection.GetConnectionStatusCodeDetailString()}"));
                         }
@@ -138,9 +167,9 @@ namespace Improbable.Stdlib
                 }
                 catch (Exception e)
                 {
-                    tcs.SetException(e);
+                    tcs.TrySetException(e);
                 }
-            }, taskOptions);
+            }, cancellation);
 
             return tcs.Task;
         }
@@ -152,12 +181,14 @@ namespace Improbable.Stdlib
                 throw new InvalidOperationException("Metrics are already being sent");
             }
 
-            metricsTask = Task.Factory.StartNew(async _ =>
+            metricsTask = Task.Factory.StartNew(async unused =>
             {
                 var metrics = new Metrics();
 
-                while (!metricsTcs.Token.IsCancellationRequested)
+                while (true)
                 {
+                    metricsTcs.Token.ThrowIfCancellationRequested();
+
                     foreach (var updater in updaterList)
                     {
                         updater.Invoke(metrics);
@@ -170,17 +201,24 @@ namespace Improbable.Stdlib
                         connection.SendMetrics(metrics);
                     }
 
-                    await Task.Delay(TimeSpan.FromMilliseconds(5000), metricsTcs.Token);
+                    await Task.Delay(TimeSpan.FromSeconds(5), metricsTcs.Token);
                 }
-            }, metricsTcs.Token, TaskCreationOptions.LongRunning);
+            }, metricsTcs.Token);
         }
 
         public void StopSendingMetrics()
         {
             metricsTcs?.Cancel();
-            metricsTcs?.Dispose();
+            try
+            {
+                metricsTask?.Wait();
+            }
+            catch
+            {
+                // Do nothing
+            }
 
-            metricsTask?.Wait();
+            metricsTcs?.Dispose();
 
             metricsTask = null;
             metricsTcs = null;
@@ -270,7 +308,7 @@ namespace Improbable.Stdlib
             }
         }
 
-        public void Send(EntityId entityId, SchemaCommandRequest request, uint? timeout, CancellationToken cancellation, CommandParameters? parameters, Action<CommandResponses> complete, Action<StatusCode, string> fail)
+        public void Send(EntityId entityId, SchemaCommandRequest request, uint? timeout, CommandParameters? parameters, Action<CommandResponses> complete, Action<StatusCode, string> fail)
         {
             ThrowCommandFailedIfNotConnected();
 
@@ -286,7 +324,7 @@ namespace Improbable.Stdlib
             }
         }
 
-        public Task<ReserveEntityIdsResult> SendReserveEntityIdsRequest(uint numberOfEntityIds, uint? timeoutMillis = null, CancellationToken cancellation = default, TaskCreationOptions options = TaskCreationOptions.None)
+        public Task<ReserveEntityIdsResult> SendReserveEntityIdsRequest(uint numberOfEntityIds, uint? timeoutMillis = null, CancellationToken cancellation = default, TaskCreationOptions taskOptions = TaskCreationOptions.RunContinuationsAsynchronously)
         {
             ThrowCommandFailedIfNotConnected();
 
@@ -296,11 +334,11 @@ namespace Improbable.Stdlib
                 {
                     FirstEntityId = responses.ReserveEntityIds.FirstEntityId,
                     NumberOfEntityIds = responses.ReserveEntityIds.NumberOfEntityIds
-                }, cancellation, options);
+                }, cancellation, taskOptions);
             }
         }
 
-        public Task<EntityId?> SendCreateEntityRequest(Entity entity, EntityId? entityId = null, uint? timeoutMillis = null, CancellationToken cancellation = default, TaskCreationOptions options = TaskCreationOptions.None)
+        public Task<EntityId?> SendCreateEntityRequest(Entity entity, EntityId? entityId = null, uint? timeoutMillis = null, CancellationToken cancellation = default, TaskCreationOptions taskOptions = TaskCreationOptions.RunContinuationsAsynchronously)
         {
             ThrowCommandFailedIfNotConnected();
 
@@ -308,11 +346,11 @@ namespace Improbable.Stdlib
             {
                 return RecordTask(connection.SendCreateEntityRequest(entity, entityId?.Value, timeoutMillis),
                     responses => responses.CreateEntity.EntityId.HasValue ? new EntityId(responses.CreateEntity.EntityId.Value) : (EntityId?) null
-                    , cancellation, options);
+                    , cancellation, taskOptions);
             }
         }
 
-        public Task<EntityId> SendDeleteEntityRequest(EntityId entityId, uint? timeoutMillis = null, CancellationToken cancellation = default, TaskCreationOptions options = TaskCreationOptions.None)
+        public Task<EntityId> SendDeleteEntityRequest(EntityId entityId, uint? timeoutMillis = null, CancellationToken cancellation = default, TaskCreationOptions taskOptions = TaskCreationOptions.RunContinuationsAsynchronously)
         {
             ThrowCommandFailedIfNotConnected();
 
@@ -320,11 +358,11 @@ namespace Improbable.Stdlib
             {
                 return RecordTask(connection.SendDeleteEntityRequest(entityId.Value, timeoutMillis),
                     responses => new EntityId(responses.DeleteEntity.EntityId)
-                    , cancellation, options);
+                    , cancellation, taskOptions);
             }
         }
 
-        public Task<EntityQueryResult> SendEntityQueryRequest(EntityQuery entityQuery, uint? timeoutMillis = null, CancellationToken cancellation = default, TaskCreationOptions options = TaskCreationOptions.None)
+        public Task<EntityQueryResult> SendEntityQueryRequest(EntityQuery entityQuery, uint? timeoutMillis = null, CancellationToken cancellation = default, TaskCreationOptions taskOptions = TaskCreationOptions.RunContinuationsAsynchronously)
         {
             ThrowCommandFailedIfNotConnected();
 
@@ -334,13 +372,13 @@ namespace Improbable.Stdlib
                 {
                     Results = responses.EntityQuery.Result.ToDictionary(kv => new EntityId(kv.Key), kv => kv.Value.DeepCopy()),
                     ResultCount = responses.EntityQuery.ResultCount
-                }, cancellation, options);
+                }, cancellation, taskOptions);
             }
         }
 
-        private Task<TResultType> RecordTask<TResultType>(uint id, Func<CommandResponses, TResultType> getResult, CancellationToken cancellation, TaskCreationOptions options)
+        private Task<TResultType> RecordTask<TResultType>(uint id, Func<CommandResponses, TResultType> getResult, CancellationToken cancellation, TaskCreationOptions taskOptions)
         {
-            var completion = new TaskCompletionSource<TResultType>(options);
+            var completion = new TaskCompletionSource<TResultType>(taskOptions);
 
             if (cancellation.CanBeCanceled)
             {
@@ -354,7 +392,7 @@ namespace Improbable.Stdlib
 
             void Fail(StatusCode code, string message)
             {
-                completion.TrySetException(new Exception(message));
+                completion.TrySetException(new CommandFailedException(code, message));
             }
 
             if (!requestsToComplete.TryAdd(id, new TaskHandler { Complete = Complete, Fail = Fail }))
@@ -519,12 +557,8 @@ namespace Improbable.Stdlib
         {
             if (connection == null || GetConnectionStatusCode() != ConnectionStatusCode.Success)
             {
-                if (GetConnectionStatusCode() != ConnectionStatusCode.Success)
-                {
-                    CancelCommands();
-                }
-
-                return EmptyOpList;
+                CancelCommands();
+                throw new Exception("Not connected to SpatialOS");
             }
 
             lock (connection)
@@ -540,11 +574,18 @@ namespace Improbable.Stdlib
         ///     An empty OpList will be returned after the specified duration. Use <see cref="TimeSpan.Zero" />
         ///     to block until new ops are available.
         /// </param>
-        /// <param name="token">Cancellation token.</param>
-        public IEnumerable<OpList> GetOpLists(TimeSpan timeout, CancellationToken token = default)
+        /// <param name="cancellation">Cancellation token.</param>
+        public IEnumerable<OpList> GetOpLists(TimeSpan timeout, CancellationToken cancellation = default)
         {
-            while (!token.IsCancellationRequested && connection != null && GetConnectionStatusCode() == ConnectionStatusCode.Success)
+            while (true)
             {
+                cancellation.ThrowIfCancellationRequested();
+
+                if (GetConnectionStatusCode() != ConnectionStatusCode.Success)
+                {
+                    yield break;
+                }
+
                 OpList opList = null;
 
                 try
@@ -586,6 +627,21 @@ namespace Improbable.Stdlib
             if (GetConnectionStatusCode() != ConnectionStatusCode.Success)
             {
                 throw new CommandFailedException(StatusCode.Timeout, "Not connected to SpatialOS");
+            }
+        }
+
+        private void CancelCommands()
+        {
+            while (!requestsToComplete.IsEmpty)
+            {
+                var keys = requestsToComplete.Keys.ToList();
+                foreach (var k in keys)
+                {
+                    if (requestsToComplete.TryRemove(k, out var request))
+                    {
+                        request.Fail(StatusCode.ApplicationError, "Canceled");
+                    }
+                }
             }
         }
 
