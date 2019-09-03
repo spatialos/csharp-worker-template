@@ -77,7 +77,11 @@ public static string InitializeDatabase(string tableName)
 -- Setup change notifications. This maps to the DatabaseChangeNotification class.
 CREATE OR REPLACE FUNCTION notify_{{tableName}}() RETURNS TRIGGER AS $$
     BEGIN
-        PERFORM pg_notify( '{{tableName}}'::text, json_build_object( 'old', row_to_json(OLD), 'new', row_to_json(NEW) )::text);
+        IF TG_OP = 'UPDATE' THEN
+            PERFORM pg_notify( '{{tableName}}'::text, json_build_object( 'old', row_to_json(OLD), 'new', row_to_json(NEW) )::text);
+        ELSE
+            PERFORM pg_notify( '{{tableName}}'::text, json_build_object( 'new', row_to_json(NEW) )::text);
+        END IF;
         RETURN NEW;
     END;
 $$ LANGUAGE plpgsql;

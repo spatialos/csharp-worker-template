@@ -3,7 +3,7 @@
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
     <LangVersion>latest</LangVersion>
-    <Version>0.0.1-preview</Version>
+    <Version>0.0.2-preview</Version>
     <Description>SpatialOS Postgres Code Generator</Description>
   </PropertyGroup>
 

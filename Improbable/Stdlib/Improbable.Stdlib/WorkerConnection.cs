@@ -22,7 +22,6 @@ namespace Improbable.Stdlib
         private Task metricsTask;
         private CancellationTokenSource metricsTcs = new CancellationTokenSource();
         private string workerId;
-
         private WorkerConnection(Connection connection)
         {
             this.connection = connection ?? throw new ArgumentNullException(nameof(connection));
@@ -61,7 +60,7 @@ namespace Improbable.Stdlib
 
                 case ILocatorOptions locatorOptions:
                     connectionParameters.Network.UseExternalIp = true;
-                    return ConnectAsync(locatorOptions.SpatialOsHost, locatorOptions.SpatialOsPort, connectionParameters, locatorOptions.Token, "Player", "", connectionParameters.WorkerType, taskOptions);
+                    return ConnectAsync(locatorOptions, connectionParameters, taskOptions);
 
                 default:
                     throw new NotImplementedException("Unrecognized option type: " + workerOptions.GetType());
@@ -99,7 +98,7 @@ namespace Improbable.Stdlib
             return tcs.Task;
         }
 
-        public static Task<WorkerConnection> ConnectAsync(string host, ushort port, ConnectionParameters connectionParameters, string authToken, string playerId, string displayName, string workerType, TaskCreationOptions taskOptions = TaskCreationOptions.None)
+        private static Task<WorkerConnection> ConnectAsync(ILocatorOptions options, ConnectionParameters connectionParameters, TaskCreationOptions taskOptions = TaskCreationOptions.None)
         {
             var tcs = new TaskCompletionSource<WorkerConnection>(taskOptions);
 
@@ -107,8 +106,8 @@ namespace Improbable.Stdlib
             {
                 try
                 {
-                    var pit = GetDevelopmentPlayerIdentityToken(host, port, authToken, playerId, displayName);
-                    var loginTokens = GetDevelopmentLoginTokens(host, port, workerType, pit);
+                    var pit = GetDevelopmentPlayerIdentityToken(options.SpatialOsHost, options.SpatialOsPort, options.UseInsecureConnection, options.DevToken, options.PlayerId, options.DisplayName);
+                    var loginTokens = GetDevelopmentLoginTokens(options.SpatialOsHost, options.SpatialOsPort, options.UseInsecureConnection, connectionParameters.WorkerType, pit);
                     var loginToken = loginTokens.First().LoginToken;
 
                     var locatorParameters = new LocatorParameters
@@ -118,10 +117,12 @@ namespace Improbable.Stdlib
                             LoginToken = loginToken,
                             PlayerIdentityToken = pit
                         },
-                        UseInsecureConnection = false
+                        UseInsecureConnection = options.UseInsecureConnection,
+                        Logging = connectionParameters.ProtocolLogging,
+                        EnableLogging = connectionParameters.EnableProtocolLoggingAtStartup
                     };
 
-                    using (var locator = new Locator(host, locatorParameters))
+                    using (var locator = new Locator(options.SpatialOsHost, options.SpatialOsPort, locatorParameters))
                     using (var future = locator.ConnectAsync(connectionParameters))
                     {
                         var connection = future.Get();
@@ -186,45 +187,63 @@ namespace Improbable.Stdlib
             metricsTcs = null;
         }
 
-        private static string GetDevelopmentPlayerIdentityToken(string host, ushort port, string authToken, string playerId, string displayName)
+        private static string GetDevelopmentPlayerIdentityToken(string host, ushort port, bool useInsecureConnection, string authToken, string playerId, string displayName)
         {
-            var pit = DevelopmentAuthentication.CreateDevelopmentPlayerIdentityTokenAsync(
+            using (var pit = DevelopmentAuthentication.CreateDevelopmentPlayerIdentityTokenAsync(
                 host, port,
                 new PlayerIdentityTokenRequest
                 {
                     DevelopmentAuthenticationToken = authToken,
                     PlayerId = playerId,
-                    DisplayName = displayName
-                }).Get();
-
-            if (pit.Value.Status.Code != ConnectionStatusCode.Success)
+                    DisplayName = displayName,
+                    UseInsecureConnection = useInsecureConnection
+                }))
             {
-                throw new AuthenticationException("Error received while retrieving a Player Identity Token: " + $"{pit.Value.Status.Detail}");
-            }
+                var value = pit.Get();
 
-            return pit.Value.PlayerIdentityToken;
+                if (!value.HasValue)
+                {
+                    throw new AuthenticationException("Error received while retrieving a Player Identity Token: null result");
+                }
+
+                if (value.Value.Status.Code != ConnectionStatusCode.Success)
+                {
+                    throw new AuthenticationException($"Error received while retrieving a Player Identity Token: {value.Value.Status.Detail}");
+                }
+
+                return value.Value.PlayerIdentityToken;
+            }
         }
 
-        private static List<LoginTokenDetails> GetDevelopmentLoginTokens(string host, ushort port, string workerType, string pit)
+        private static List<LoginTokenDetails> GetDevelopmentLoginTokens(string host, ushort port, bool useInsecureConnection, string workerType, string pit)
         {
-            var tokens = DevelopmentAuthentication.CreateDevelopmentLoginTokensAsync(host, port,
+            using (var tokens = DevelopmentAuthentication.CreateDevelopmentLoginTokensAsync(host, port,
                 new LoginTokensRequest
                 {
                     PlayerIdentityToken = pit,
-                    WorkerType = workerType
-                }).Get();
-
-            if (tokens.Value.Status.Code != ConnectionStatusCode.Success)
+                    WorkerType = workerType,
+                    UseInsecureConnection = useInsecureConnection,
+                }))
             {
-                throw new AuthenticationException("Error received while retrieving Login Tokens: " + $"{tokens.Value.Status.Detail}");
-            }
+                var value = tokens.Get();
 
-            if (tokens.Value.LoginTokens.Count == 0)
-            {
-                throw new Exception("No deployment returned for this project.");
-            }
+                if (!value.HasValue)
+                {
+                    throw new AuthenticationException("Error received while retrieving Login Tokens: null result");
+                }
 
-            return tokens.Value.LoginTokens;
+                if (value.Value.Status.Code != ConnectionStatusCode.Success)
+                {
+                    throw new AuthenticationException($"Error received while retrieving Login Tokens: {value.Value.Status.Detail}");
+                }
+
+                if (value.Value.LoginTokens.Count == 0)
+                {
+                    throw new Exception("No deployment returned for this project.");
+                }
+
+                return value.Value.LoginTokens;
+            }
         }
 
         public void ProcessOpList(OpList opList)
@@ -254,13 +273,15 @@ namespace Improbable.Stdlib
 
         public void Send(EntityId entityId, SchemaCommandRequest request, uint? timeout, CommandParameters? parameters, Action<CommandResponses> complete, Action<StatusCode, string> fail, Action cancel)
         {
+            ThrowCommandFailedIfNotConnected();
+
             uint requestId;
             lock (connection)
             {
                 requestId = connection.SendCommandRequest(entityId.Value, new CommandRequest(request), 1, timeout, parameters);
             }
 
-            if (!requestsToComplete.TryAdd(requestId, new TaskHandler {Cancel = cancel, Complete = complete, Fail = fail}))
+            if (!requestsToComplete.TryAdd(requestId, new TaskHandler { Cancel = cancel, Complete = complete, Fail = fail }))
             {
                 throw new InvalidOperationException("Key already exists");
             }
@@ -283,6 +304,8 @@ namespace Improbable.Stdlib
 
         public Task<ReserveEntityIdsResult> SendReserveEntityIdsRequest(uint numberOfEntityIds, uint? timeoutMillis = null)
         {
+            ThrowCommandFailedIfNotConnected();
+
             lock (connection)
             {
                 return RecordTask(connection.SendReserveEntityIdsRequest(numberOfEntityIds, timeoutMillis), responses => new ReserveEntityIdsResult
@@ -295,6 +318,8 @@ namespace Improbable.Stdlib
 
         public Task<EntityId?> SendCreateEntityRequest(Entity entity, EntityId? entityId = null, uint? timeoutMillis = null)
         {
+            ThrowCommandFailedIfNotConnected();
+
             lock (connection)
             {
                 return RecordTask(connection.SendCreateEntityRequest(entity, entityId?.Value, timeoutMillis), responses => responses.CreateEntity.EntityId.HasValue ? new EntityId(responses.CreateEntity.EntityId.Value) : (EntityId?) null);
@@ -303,6 +328,8 @@ namespace Improbable.Stdlib
 
         public Task<EntityId> SendDeleteEntityRequest(EntityId entityId, uint? timeoutMillis = null)
         {
+            ThrowCommandFailedIfNotConnected();
+
             lock (connection)
             {
                 return RecordTask(connection.SendDeleteEntityRequest(entityId.Value, timeoutMillis), responses => new EntityId(responses.DeleteEntity.EntityId));
@@ -311,6 +338,8 @@ namespace Improbable.Stdlib
 
         public Task<EntityQueryResult> SendEntityQueryRequest(EntityQuery entityQuery, uint? timeoutMillis = null)
         {
+            ThrowCommandFailedIfNotConnected();
+
             lock (connection)
             {
                 return RecordTask(connection.SendEntityQueryRequest(entityQuery, timeoutMillis), responses => new EntityQueryResult
@@ -344,7 +373,7 @@ namespace Improbable.Stdlib
                 cancellation.Dispose();
             }
 
-            if (!requestsToComplete.TryAdd(id, new TaskHandler {Cancel = Cancel, Complete = Complete, Fail = Fail}))
+            if (!requestsToComplete.TryAdd(id, new TaskHandler { Cancel = Cancel, Complete = Complete, Fail = Fail }))
             {
                 throw new InvalidOperationException("Key already exists");
             }
@@ -359,7 +388,7 @@ namespace Improbable.Stdlib
                 switch (r.StatusCode)
                 {
                     case StatusCode.Success:
-                        completer.Complete(new CommandResponses {ReserveEntityIds = r});
+                        completer.Complete(new CommandResponses { ReserveEntityIds = r });
                         break;
                     default:
                         completer.Fail(r.StatusCode, r.Message);
@@ -375,7 +404,7 @@ namespace Improbable.Stdlib
                 switch (r.StatusCode)
                 {
                     case StatusCode.Success:
-                        completer.Complete(new CommandResponses {EntityQuery = r});
+                        completer.Complete(new CommandResponses { EntityQuery = r });
                         break;
                     default:
                         completer.Fail(r.StatusCode, r.Message);
@@ -396,7 +425,7 @@ namespace Improbable.Stdlib
                             throw new ArgumentNullException();
                         }
 
-                        completer.Complete(new CommandResponses {UserCommand = r});
+                        completer.Complete(new CommandResponses { UserCommand = r });
                         break;
                     default:
                         completer.Fail(r.StatusCode, r.Message);
@@ -412,7 +441,7 @@ namespace Improbable.Stdlib
                 switch (r.StatusCode)
                 {
                     case StatusCode.Success:
-                        completer.Complete(new CommandResponses {CreateEntity = r});
+                        completer.Complete(new CommandResponses { CreateEntity = r });
                         break;
                     default:
                         completer.Fail(r.StatusCode, r.Message);
@@ -428,7 +457,7 @@ namespace Improbable.Stdlib
                 switch (r.StatusCode)
                 {
                     case StatusCode.Success:
-                        completer.Complete(new CommandResponses {DeleteEntity = r});
+                        completer.Complete(new CommandResponses { DeleteEntity = r });
                         break;
                     default:
                         completer.Fail(r.StatusCode, r.Message);
@@ -439,6 +468,11 @@ namespace Improbable.Stdlib
 
         public void SendCommandResponse(uint id, SchemaCommandResponse response)
         {
+            if (GetConnectionStatusCode() != ConnectionStatusCode.Success)
+            {
+                throw new Exception("Not connected to SpatialOS");
+            }
+
             lock (connection)
             {
                 connection.SendCommandResponse(id, new CommandResponse(response));
@@ -447,6 +481,11 @@ namespace Improbable.Stdlib
 
         public void SendCommandFailure(uint requestId, string message)
         {
+            if (GetConnectionStatusCode() != ConnectionStatusCode.Success)
+            {
+                throw new Exception("Not connected to SpatialOS");
+            }
+
             lock (connection)
             {
                 connection.SendCommandFailure(requestId, message);
@@ -455,6 +494,11 @@ namespace Improbable.Stdlib
 
         public void SendComponentUpdate(EntityId entityId, SchemaComponentUpdate update, UpdateParameters? updateParameters = null)
         {
+            if (GetConnectionStatusCode() != ConnectionStatusCode.Success)
+            {
+                throw new Exception("Not connected to SpatialOS");
+            }
+
             lock (connection)
             {
                 connection.SendComponentUpdate(entityId.Value, new ComponentUpdate(update), updateParameters);
@@ -463,6 +507,11 @@ namespace Improbable.Stdlib
 
         public void SendMetrics(Metrics metrics)
         {
+            if (GetConnectionStatusCode() != ConnectionStatusCode.Success)
+            {
+                throw new Exception("Not connected to SpatialOS");
+            }
+
             lock (connection)
             {
                 connection.SendMetrics(metrics);
@@ -486,6 +535,11 @@ namespace Improbable.Stdlib
         {
             if (connection == null || GetConnectionStatusCode() != ConnectionStatusCode.Success)
             {
+                if (GetConnectionStatusCode() != ConnectionStatusCode.Success)
+                {
+                    CancelCommands();
+                }
+
                 return EmptyOpList;
             }
 
@@ -500,22 +554,10 @@ namespace Improbable.Stdlib
         /// </summary>
         /// <param name="timeout">
         ///     An empty OpList will be returned after the specified duration. Use <see cref="TimeSpan.Zero" />
-        ///     to block.
-        /// </param>
-        public IEnumerable<OpList> GetOpLists(TimeSpan timeout)
-        {
-            return GetOpLists(timeout, CancellationToken.None);
-        }
-
-        /// <summary>
-        ///     Returns OpLists for as long as connected to SpatialOS.
-        /// </summary>
-        /// <param name="timeout">
-        ///     An empty OpList will be returned after the specified duration. Use <see cref="TimeSpan.Zero" />
         ///     to block until new ops are available.
         /// </param>
         /// <param name="token">Cancellation token.</param>
-        public IEnumerable<OpList> GetOpLists(TimeSpan timeout, CancellationToken token)
+        public IEnumerable<OpList> GetOpLists(TimeSpan timeout, CancellationToken token = default)
         {
             while (!token.IsCancellationRequested && connection != null && GetConnectionStatusCode() == ConnectionStatusCode.Success)
             {
@@ -533,15 +575,33 @@ namespace Improbable.Stdlib
                 finally
                 {
                     opList?.Dispose();
+
+                    if (GetConnectionStatusCode() != ConnectionStatusCode.Success)
+                    {
+                        CancelCommands();
+                    }
                 }
             }
         }
 
         public string GetWorkerFlag(string flagName)
         {
+            if (GetConnectionStatusCode() != ConnectionStatusCode.Success)
+            {
+                throw new Exception("Not connected to SpatialOS");
+            }
+
             lock (connection)
             {
                 return connection.GetWorkerFlag(flagName);
+            }
+        }
+
+        private void ThrowCommandFailedIfNotConnected()
+        {
+            if (GetConnectionStatusCode() != ConnectionStatusCode.Success)
+            {
+                throw new CommandFailedException(StatusCode.Timeout, "Not connected to SpatialOS");
             }
         }
 

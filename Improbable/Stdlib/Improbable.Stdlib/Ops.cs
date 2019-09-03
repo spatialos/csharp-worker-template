@@ -28,58 +28,58 @@ namespace Improbable.Stdlib
                 switch (rawOps.GetOpType(i))
                 {
                     case OpType.Disconnect:
-                        Ops.Add(new Op {OpType = OpType.Disconnect, DisconnectOp = rawOps.GetDisconnectOp(i)});
+                        Ops.Add(new Op { OpType = OpType.Disconnect, DisconnectOp = rawOps.GetDisconnectOp(i) });
                         break;
                     case OpType.FlagUpdate:
-                        Ops.Add(new Op {OpType = OpType.FlagUpdate, FlagUpdateOp = rawOps.GetFlagUpdateOp(i)});
+                        Ops.Add(new Op { OpType = OpType.FlagUpdate, FlagUpdateOp = rawOps.GetFlagUpdateOp(i) });
                         break;
                     case OpType.LogMessage:
-                        Ops.Add(new Op {OpType = OpType.LogMessage, LogMessageOp = rawOps.GetLogMessageOp(i)});
+                        Ops.Add(new Op { OpType = OpType.LogMessage, LogMessageOp = rawOps.GetLogMessageOp(i) });
                         break;
                     case OpType.Metrics:
-                        Ops.Add(new Op {OpType = OpType.Metrics, MetricsOp = rawOps.GetMetricsOp(i)});
+                        Ops.Add(new Op { OpType = OpType.Metrics, MetricsOp = rawOps.GetMetricsOp(i) });
                         break;
                     case OpType.CriticalSection:
-                        Ops.Add(new Op {OpType = OpType.CriticalSection, CriticalSectionOp = rawOps.GetCriticalSectionOp(i)});
+                        Ops.Add(new Op { OpType = OpType.CriticalSection, CriticalSectionOp = rawOps.GetCriticalSectionOp(i) });
                         break;
                     case OpType.AddEntity:
-                        Ops.Add(new Op {OpType = OpType.AddEntity, AddEntityOp = rawOps.GetAddEntityOp(i)});
+                        Ops.Add(new Op { OpType = OpType.AddEntity, AddEntityOp = rawOps.GetAddEntityOp(i) });
                         break;
                     case OpType.RemoveEntity:
-                        Ops.Add(new Op {OpType = OpType.RemoveEntity, RemoveEntityOp = rawOps.GetRemoveEntityOp(i)});
+                        Ops.Add(new Op { OpType = OpType.RemoveEntity, RemoveEntityOp = rawOps.GetRemoveEntityOp(i) });
                         break;
                     case OpType.ReserveEntityIdResponse:
                         // Deprecated - should we even bother?
                         break;
                     case OpType.ReserveEntityIdsResponse:
-                        Ops.Add(new Op {OpType = OpType.ReserveEntityIdsResponse, ReserveEntityIdsResponseOp = rawOps.GetReserveEntityIdsResponseOp(i)});
+                        Ops.Add(new Op { OpType = OpType.ReserveEntityIdsResponse, ReserveEntityIdsResponseOp = rawOps.GetReserveEntityIdsResponseOp(i) });
                         break;
                     case OpType.CreateEntityResponse:
-                        Ops.Add(new Op {OpType = OpType.CreateEntityResponse, CreateEntityResponseOp = rawOps.GetCreateEntityResponseOp(i)});
+                        Ops.Add(new Op { OpType = OpType.CreateEntityResponse, CreateEntityResponseOp = rawOps.GetCreateEntityResponseOp(i) });
                         break;
                     case OpType.DeleteEntityResponse:
-                        Ops.Add(new Op {OpType = OpType.DeleteEntityResponse, DeleteEntityResponseOp = rawOps.GetDeleteEntityResponseOp(i)});
+                        Ops.Add(new Op { OpType = OpType.DeleteEntityResponse, DeleteEntityResponseOp = rawOps.GetDeleteEntityResponseOp(i) });
                         break;
                     case OpType.EntityQueryResponse:
-                        Ops.Add(new Op {OpType = OpType.EntityQueryResponse, EntityQueryResponseOp = rawOps.GetEntityQueryResponseOp(i)});
+                        Ops.Add(new Op { OpType = OpType.EntityQueryResponse, EntityQueryResponseOp = rawOps.GetEntityQueryResponseOp(i) });
                         break;
                     case OpType.AddComponent:
-                        Ops.Add(new Op {OpType = OpType.AddComponent, AddComponentOp = rawOps.GetAddComponentOp(i)});
+                        Ops.Add(new Op { OpType = OpType.AddComponent, AddComponentOp = rawOps.GetAddComponentOp(i) });
                         break;
                     case OpType.RemoveComponent:
-                        Ops.Add(new Op {OpType = OpType.RemoveComponent, RemoveComponentOp = rawOps.GetRemoveComponentOp(i)});
+                        Ops.Add(new Op { OpType = OpType.RemoveComponent, RemoveComponentOp = rawOps.GetRemoveComponentOp(i) });
                         break;
                     case OpType.AuthorityChange:
-                        Ops.Add(new Op {OpType = OpType.AuthorityChange, AuthorityChangeOp = rawOps.GetAuthorityChangeOp(i)});
+                        Ops.Add(new Op { OpType = OpType.AuthorityChange, AuthorityChangeOp = rawOps.GetAuthorityChangeOp(i) });
                         break;
                     case OpType.ComponentUpdate:
-                        Ops.Add(new Op {OpType = OpType.ComponentUpdate, ComponentUpdateOp = rawOps.GetComponentUpdateOp(i)});
+                        Ops.Add(new Op { OpType = OpType.ComponentUpdate, ComponentUpdateOp = rawOps.GetComponentUpdateOp(i) });
                         break;
                     case OpType.CommandRequest:
-                        Ops.Add(new Op {OpType = OpType.CommandRequest, CommandRequestOp = rawOps.GetCommandRequestOp(i)});
+                        Ops.Add(new Op { OpType = OpType.CommandRequest, CommandRequestOp = rawOps.GetCommandRequestOp(i) });
                         break;
                     case OpType.CommandResponse:
-                        Ops.Add(new Op {OpType = OpType.CommandResponse, CommandResponseOp = rawOps.GetCommandResponseOp(i)});
+                        Ops.Add(new Op { OpType = OpType.CommandResponse, CommandResponseOp = rawOps.GetCommandResponseOp(i) });
                         break;
                     default:
                         throw new ArgumentOutOfRangeException();

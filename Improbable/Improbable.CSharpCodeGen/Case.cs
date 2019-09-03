@@ -6,8 +6,8 @@ namespace Improbable.CSharpCodeGen
 {
     public static class Case
     {
-        private static readonly string[] Underscore = {"_"};
-        private static readonly string[] Period = {"."};
+        private static readonly string[] Underscore = { "_" };
+        private static readonly string[] Period = { "." };
 
         public static string CapitalizeFirstLetter(string text)
         {
@@ -58,7 +58,7 @@ namespace Improbable.CSharpCodeGen
 
         public static string AllCapsSnakeCaseToPascalCase(string screamingSnake)
         {
-            return screamingSnake.Split(new[] {"_"}, StringSplitOptions.RemoveEmptyEntries)
+            return screamingSnake.Split(new[] { "_" }, StringSplitOptions.RemoveEmptyEntries)
                 .Select(part =>
                 {
                     if (part.Length == 1)

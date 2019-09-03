@@ -21,7 +21,7 @@ namespace Improbable.Schema.Bundle
             Enums = bundle.SchemaFiles.SelectMany(f => f.Enums).ToDictionary(t => t.QualifiedName, t => t);
             CommandTypes = bundle.SchemaFiles.SelectMany(f => f.Components)
                 .SelectMany(c => c.Commands)
-                .SelectMany(cmd => new[] {cmd.RequestType, cmd.ResponseType}).ToList();
+                .SelectMany(cmd => new[] { cmd.RequestType, cmd.ResponseType }).ToList();
 
             var fileNameDict = new Dictionary<string, SchemaFile>();
             TypeToFile = fileNameDict;

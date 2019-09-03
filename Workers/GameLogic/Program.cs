@@ -1,10 +1,8 @@
 using System;
 using System.IO;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
 using CommandLine;
-using GameLogic;
 using Improbable.Stdlib;
 using Improbable.Worker.CInterop;
 using Serilog;
@@ -30,9 +28,8 @@ namespace GameLogic
 
             IWorkerOptions options = null;
 
-            Parser.Default.ParseArguments<ReceptionistOptions, LocatorOptions>(args)
-                .WithParsed<ReceptionistOptions>(opts => options = opts)
-                .WithParsed<LocatorOptions>(opts => options = opts);
+            Parser.Default.ParseArguments<ReceptionistOptions>(args)
+                .WithParsed(opts => options = opts);
 
             if (options == null)
             {
@@ -105,32 +102,6 @@ namespace GameLogic
 
         private static void ProcessOpList(OpList opList)
         {
-            foreach (var logOp in opList.OfOpType<LogMessageOp>())
-            {
-                switch (logOp.Level)
-                {
-                    case LogLevel.Debug:
-                        Log.Debug(logOp.Message);
-                        break;
-                    case LogLevel.Info:
-                        Log.Information(logOp.Message);
-                        break;
-                    case LogLevel.Warn:
-                        Log.Warning(logOp.Message);
-                        break;
-                    case LogLevel.Error:
-                        Log.Error(logOp.Message);
-                        break;
-                    case LogLevel.Fatal:
-                        Log.Fatal(logOp.Message);
-                        break;
-                    default:
-                        throw new ArgumentOutOfRangeException();
-                }
-
-                break;
-            }
-
             foreach (var disconnectOp in opList.OfOpType<DisconnectOp>())
             {
                 Log.Information(disconnectOp.Reason);

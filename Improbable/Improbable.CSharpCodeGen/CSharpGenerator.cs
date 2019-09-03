@@ -27,7 +27,7 @@ namespace Improbable.CSharpCodeGen
             }
 
             sb.AppendLine(GenerateFields(type, type.Fields));
-            
+
             // For types with a single field of map or list type, provide a params-style constructor for nicer ergonomics.
             if (type.Fields.Count == 1 && (type.Fields[0].TypeSelector == FieldType.List || type.Fields[0].TypeSelector == FieldType.Map))
             {

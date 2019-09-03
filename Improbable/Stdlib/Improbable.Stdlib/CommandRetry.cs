@@ -7,17 +7,7 @@ namespace Improbable.Stdlib
 {
     public static class CommandRetry
     {
-        public static Task<TResult> Retry<TResult>(Func<Task<TResult>> action, int maxRetries = 10)
-        {
-            return Retry(action, CancellationToken.None, maxRetries, TimeSpan.FromSeconds(1));
-        }
-
-        public static Task<TResult> Retry<TResult>(Func<Task<TResult>> action, int maxRetries, TimeSpan delay)
-        {
-            return Retry(action, CancellationToken.None, maxRetries, delay);
-        }
-
-        public static Task<TResult> Retry<TResult>(Func<Task<TResult>> action, CancellationToken token, int maxRetries, TimeSpan delay)
+        public static Task<TResult> Retry<TResult>(Func<Task<TResult>> action, int maxRetries, TimeSpan delay, CancellationToken token = default)
         {
             return Task.Run(async () =>
             {

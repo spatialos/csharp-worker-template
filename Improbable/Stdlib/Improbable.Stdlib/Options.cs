@@ -31,8 +31,17 @@ namespace Improbable.Stdlib
         [Option("spatialos-port", Default = (ushort) 444, HelpText = "The port to use to connect to SpatialOS.")]
         ushort SpatialOsPort { get; set; }
 
-        [Option("token", Required = true, HelpText = "Your Development Auth Token. For more information: \n " +
-                                                     "https://docs.improbable.io/reference/13.7/shared/auth/development-authentication#create-a-developmentauthenticationtoken")]
-        string Token { get; set; }
+        [Option("spatialos-use-insecure-connection")]
+        bool UseInsecureConnection { get; set; }
+
+        [Option("dev-token", HelpText = "Your Development Auth Token. For more information: \n " +
+                                                     "https://docs.improbable.io/reference/13.8/shared/auth/development-authentication#create-a-developmentauthenticationtoken")]
+        string DevToken { get; set; }
+
+        [Option("display-name")]
+        string DisplayName { get; set; }
+
+        [Option("player-id")]
+        string PlayerId { get; set; }
     }
 }
