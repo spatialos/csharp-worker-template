@@ -8,6 +8,7 @@ namespace Improbable.Stdlib.CSharpCodeGen
     public class StdlibGenerator : ICodeGenerator
     {
         private const string WorkerConnectionType = "global::Improbable.Stdlib.WorkerConnection";
+        private const string CancellationTokenType = "global::System.Threading.CancellationToken";
         private readonly Bundle bundle;
 
         public StdlibGenerator(Bundle bundle)
@@ -57,9 +58,9 @@ namespace Improbable.Stdlib.CSharpCodeGen
 
                 commandIndices.AppendLine($"{cmdName} = {cmd.CommandIndex},");
 
-                bindingMethods.AppendLine($@"public global::System.Threading.Tasks.Task<{response}> Send{cmdName}Async({request} request, uint? timeout = null, global::Improbable.Worker.CInterop.CommandParameters? parameters = null)
+                bindingMethods.AppendLine($@"public global::System.Threading.Tasks.Task<{response}> Send{cmdName}Async({request} request, {CancellationTokenType} cancellation = default, uint? timeout = null, global::Improbable.Worker.CInterop.CommandParameters? parameters = null)
 {{
-    return global::{Case.CapitalizeNamespace(type.QualifiedName)}.Send{cmdName}Async(connection, entityId, request, timeout, parameters);
+    return global::{Case.CapitalizeNamespace(type.QualifiedName)}.Send{cmdName}Async(connection, entityId, request, cancellation, timeout, parameters);
 }}
 
 public void Send{cmdName}Response(uint id, {response} response)
@@ -76,36 +77,35 @@ public void Send{cmdName}Response(uint id, {response} response)
     connection.SendCommandResponse(id, schemaResponse);
 }}
 
-public static global::System.Threading.Tasks.Task<{response}> Send{cmdName}Async({WorkerConnectionType} connection, {Types.EntityIdType} entityId, {request} request, uint? timeout = null, global::Improbable.Worker.CInterop.CommandParameters? parameters = null)
+public static global::System.Threading.Tasks.Task<{response}> Send{cmdName}Async({WorkerConnectionType} connection,
+                                                                                 {Types.EntityIdType} entityId,
+                                                                                 {request} request,
+                                                                                 {CancellationTokenType} cancellation = default,
+                                                                                 uint? timeout = null,
+                                                                                 global::Improbable.Worker.CInterop.CommandParameters? parameters = null,
+                                                                                 global::System.Threading.Tasks.TaskCreationOptions options = global::System.Threading.Tasks.TaskCreationOptions.None)
 {{
     var schemaRequest = new global::Improbable.Worker.CInterop.SchemaCommandRequest({componentName}.ComponentId, {cmd.CommandIndex});
     request.ApplyToSchemaObject(schemaRequest.GetObject());
 
-    var completion = new global::System.Threading.Tasks.TaskCompletionSource<{response}>(global::System.Threading.Tasks.TaskCreationOptions.RunContinuationsAsynchronously);
-
-    var cancellation = new global::System.Threading.CancellationTokenSource();
-    cancellation.Token.Register(() => completion.TrySetCanceled(cancellation.Token));
+    var completion = new global::System.Threading.Tasks.TaskCompletionSource<{response}>(options);
+    if (cancellation.CanBeCanceled)
+    {{
+        cancellation.Register(() => completion.TrySetCanceled(cancellation));
+    }}    
 
     void Complete(global::Improbable.Stdlib.WorkerConnection.CommandResponses r)
     {{
         var result = new {response}(r.UserCommand.Response.SchemaData.Value.GetObject());
         completion.TrySetResult(result);
-        cancellation.Dispose();
     }}
 
     void Fail(global::Improbable.Worker.CInterop.StatusCode code, string message)
     {{
         completion.TrySetException(new global::Improbable.Stdlib.CommandFailedException(code, message));
-        cancellation.Dispose();
     }}
 
-    void Cancel()
-    {{
-        cancellation.Cancel();
-        cancellation.Dispose();
-    }}
-
-    connection.Send(entityId, schemaRequest, timeout, parameters, Complete, Fail, Cancel);
+    connection.Send(entityId, schemaRequest, timeout, cancellation, parameters, Complete, Fail);
 
     return completion.Task;
 }}");

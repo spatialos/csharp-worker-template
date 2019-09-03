@@ -43,7 +43,6 @@ namespace Improbable.Stdlib
 
         public void Dispose()
         {
-            CancelCommands();
             StopSendingMetrics();
 
             connection?.Dispose();
@@ -271,7 +270,7 @@ namespace Improbable.Stdlib
             }
         }
 
-        public void Send(EntityId entityId, SchemaCommandRequest request, uint? timeout, CommandParameters? parameters, Action<CommandResponses> complete, Action<StatusCode, string> fail, Action cancel)
+        public void Send(EntityId entityId, SchemaCommandRequest request, uint? timeout, CancellationToken cancellation, CommandParameters? parameters, Action<CommandResponses> complete, Action<StatusCode, string> fail)
         {
             ThrowCommandFailedIfNotConnected();
 
@@ -281,28 +280,13 @@ namespace Improbable.Stdlib
                 requestId = connection.SendCommandRequest(entityId.Value, new CommandRequest(request), 1, timeout, parameters);
             }
 
-            if (!requestsToComplete.TryAdd(requestId, new TaskHandler { Cancel = cancel, Complete = complete, Fail = fail }))
+            if (!requestsToComplete.TryAdd(requestId, new TaskHandler { Complete = complete, Fail = fail }))
             {
                 throw new InvalidOperationException("Key already exists");
             }
         }
 
-        private void CancelCommands()
-        {
-            while (!requestsToComplete.IsEmpty)
-            {
-                var keys = requestsToComplete.Keys.ToList();
-                foreach (var k in keys)
-                {
-                    if (requestsToComplete.TryRemove(k, out var request))
-                    {
-                        request.Cancel();
-                    }
-                }
-            }
-        }
-
-        public Task<ReserveEntityIdsResult> SendReserveEntityIdsRequest(uint numberOfEntityIds, uint? timeoutMillis = null)
+        public Task<ReserveEntityIdsResult> SendReserveEntityIdsRequest(uint numberOfEntityIds, uint? timeoutMillis = null, CancellationToken cancellation = default, TaskCreationOptions options = TaskCreationOptions.None)
         {
             ThrowCommandFailedIfNotConnected();
 
@@ -312,31 +296,35 @@ namespace Improbable.Stdlib
                 {
                     FirstEntityId = responses.ReserveEntityIds.FirstEntityId,
                     NumberOfEntityIds = responses.ReserveEntityIds.NumberOfEntityIds
-                });
+                }, cancellation, options);
             }
         }
 
-        public Task<EntityId?> SendCreateEntityRequest(Entity entity, EntityId? entityId = null, uint? timeoutMillis = null)
+        public Task<EntityId?> SendCreateEntityRequest(Entity entity, EntityId? entityId = null, uint? timeoutMillis = null, CancellationToken cancellation = default, TaskCreationOptions options = TaskCreationOptions.None)
         {
             ThrowCommandFailedIfNotConnected();
 
             lock (connection)
             {
-                return RecordTask(connection.SendCreateEntityRequest(entity, entityId?.Value, timeoutMillis), responses => responses.CreateEntity.EntityId.HasValue ? new EntityId(responses.CreateEntity.EntityId.Value) : (EntityId?) null);
+                return RecordTask(connection.SendCreateEntityRequest(entity, entityId?.Value, timeoutMillis),
+                    responses => responses.CreateEntity.EntityId.HasValue ? new EntityId(responses.CreateEntity.EntityId.Value) : (EntityId?) null
+                    , cancellation, options);
             }
         }
 
-        public Task<EntityId> SendDeleteEntityRequest(EntityId entityId, uint? timeoutMillis = null)
+        public Task<EntityId> SendDeleteEntityRequest(EntityId entityId, uint? timeoutMillis = null, CancellationToken cancellation = default, TaskCreationOptions options = TaskCreationOptions.None)
         {
             ThrowCommandFailedIfNotConnected();
 
             lock (connection)
             {
-                return RecordTask(connection.SendDeleteEntityRequest(entityId.Value, timeoutMillis), responses => new EntityId(responses.DeleteEntity.EntityId));
+                return RecordTask(connection.SendDeleteEntityRequest(entityId.Value, timeoutMillis),
+                    responses => new EntityId(responses.DeleteEntity.EntityId)
+                    , cancellation, options);
             }
         }
 
-        public Task<EntityQueryResult> SendEntityQueryRequest(EntityQuery entityQuery, uint? timeoutMillis = null)
+        public Task<EntityQueryResult> SendEntityQueryRequest(EntityQuery entityQuery, uint? timeoutMillis = null, CancellationToken cancellation = default, TaskCreationOptions options = TaskCreationOptions.None)
         {
             ThrowCommandFailedIfNotConnected();
 
@@ -346,16 +334,18 @@ namespace Improbable.Stdlib
                 {
                     Results = responses.EntityQuery.Result.ToDictionary(kv => new EntityId(kv.Key), kv => kv.Value.DeepCopy()),
                     ResultCount = responses.EntityQuery.ResultCount
-                });
+                }, cancellation, options);
             }
         }
 
-        private Task<TResultType> RecordTask<TResultType>(uint id, Func<CommandResponses, TResultType> getResult)
+        private Task<TResultType> RecordTask<TResultType>(uint id, Func<CommandResponses, TResultType> getResult, CancellationToken cancellation, TaskCreationOptions options)
         {
-            var completion = new TaskCompletionSource<TResultType>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var completion = new TaskCompletionSource<TResultType>(options);
 
-            var cancellation = new CancellationTokenSource();
-            cancellation.Token.Register(() => completion.TrySetCanceled(cancellation.Token));
+            if (cancellation.CanBeCanceled)
+            {
+                cancellation.Register(() => completion.TrySetCanceled(cancellation));
+            }
 
             void Complete(CommandResponses r)
             {
@@ -367,13 +357,7 @@ namespace Improbable.Stdlib
                 completion.TrySetException(new Exception(message));
             }
 
-            void Cancel()
-            {
-                cancellation.Cancel();
-                cancellation.Dispose();
-            }
-
-            if (!requestsToComplete.TryAdd(id, new TaskHandler { Cancel = Cancel, Complete = Complete, Fail = Fail }))
+            if (!requestsToComplete.TryAdd(id, new TaskHandler { Complete = Complete, Fail = Fail }))
             {
                 throw new InvalidOperationException("Key already exists");
             }
@@ -422,7 +406,7 @@ namespace Improbable.Stdlib
                     case StatusCode.Success:
                         if (!r.Response.SchemaData.HasValue)
                         {
-                            throw new ArgumentNullException();
+                            throw new ArgumentNullException(nameof(r.Response.SchemaData));
                         }
 
                         completer.Complete(new CommandResponses { UserCommand = r });
@@ -650,7 +634,6 @@ namespace Improbable.Stdlib
 
         private class TaskHandler
         {
-            public Action Cancel;
             public Action<CommandResponses> Complete;
             public Action<StatusCode, string> Fail;
         }
