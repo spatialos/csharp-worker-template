@@ -16,12 +16,13 @@ namespace Improbable.Stdlib
 {
     public class WorkerConnection : IDisposable
     {
-        private static readonly OpList EmptyOpList = new OpList();
         private readonly ConcurrentDictionary<uint, TaskHandler> requestsToComplete = new ConcurrentDictionary<uint, TaskHandler>();
         private Connection connection;
         private Task metricsTask;
         private CancellationTokenSource metricsTcs = new CancellationTokenSource();
         private string workerId;
+        private object connectionLock = new object();
+
         private WorkerConnection(Connection connection)
         {
             this.connection = connection ?? throw new ArgumentNullException(nameof(connection));
@@ -43,11 +44,15 @@ namespace Improbable.Stdlib
 
         public void Dispose()
         {
-            StopSendingMetrics();
-            CancelCommands();
+            lock (connectionLock)
+            {
+                StopSendingMetrics();
+                CancelCommands();
 
-            connection?.Dispose();
-            connection = null;
+                connection?.Dispose();
+                connection = null;
+            }
+
         }
 
         public static Task<WorkerConnection> ConnectAsync(IWorkerOptions workerOptions, ConnectionParameters connectionParameters, CancellationToken cancellation = default)
@@ -195,7 +200,7 @@ namespace Improbable.Stdlib
 
                     metrics.Load = await GetCpuUsageForProcess(metricsTcs.Token) / 100.0;
 
-                    lock (connection)
+                    lock (connectionLock)
                     {
                         connection.SendMetrics(metrics);
                     }
@@ -312,7 +317,7 @@ namespace Improbable.Stdlib
             ThrowCommandFailedIfNotConnected();
 
             uint requestId;
-            lock (connection)
+            lock (connectionLock)
             {
                 requestId = connection.SendCommandRequest(entityId.Value, new CommandRequest(request), 1, timeout, parameters);
             }
@@ -327,7 +332,7 @@ namespace Improbable.Stdlib
         {
             ThrowCommandFailedIfNotConnected();
 
-            lock (connection)
+            lock (connectionLock)
             {
                 return RecordTask(connection.SendReserveEntityIdsRequest(numberOfEntityIds, timeoutMillis), responses => new ReserveEntityIdsResult
                 {
@@ -341,7 +346,7 @@ namespace Improbable.Stdlib
         {
             ThrowCommandFailedIfNotConnected();
 
-            lock (connection)
+            lock (connectionLock)
             {
                 return RecordTask(connection.SendCreateEntityRequest(entity, entityId?.Value, timeoutMillis),
                     responses => responses.CreateEntity.EntityId.HasValue ? new EntityId(responses.CreateEntity.EntityId.Value) : (EntityId?) null
@@ -353,7 +358,7 @@ namespace Improbable.Stdlib
         {
             ThrowCommandFailedIfNotConnected();
 
-            lock (connection)
+            lock (connectionLock)
             {
                 return RecordTask(connection.SendDeleteEntityRequest(entityId.Value, timeoutMillis),
                     responses => new EntityId(responses.DeleteEntity.EntityId)
@@ -365,7 +370,7 @@ namespace Improbable.Stdlib
         {
             ThrowCommandFailedIfNotConnected();
 
-            lock (connection)
+            lock (connectionLock)
             {
                 return RecordTask(connection.SendEntityQueryRequest(entityQuery, timeoutMillis), responses => new EntityQueryResult
                 {
@@ -494,7 +499,7 @@ namespace Improbable.Stdlib
                 throw new Exception("Not connected to SpatialOS");
             }
 
-            lock (connection)
+            lock (connectionLock)
             {
                 connection.SendCommandResponse(id, new CommandResponse(response));
             }
@@ -507,7 +512,7 @@ namespace Improbable.Stdlib
                 throw new Exception("Not connected to SpatialOS");
             }
 
-            lock (connection)
+            lock (connectionLock)
             {
                 connection.SendCommandFailure(requestId, message);
             }
@@ -520,7 +525,7 @@ namespace Improbable.Stdlib
                 throw new Exception("Not connected to SpatialOS");
             }
 
-            lock (connection)
+            lock (connectionLock)
             {
                 connection.SendComponentUpdate(entityId.Value, new ComponentUpdate(update), updateParameters);
             }
@@ -533,7 +538,7 @@ namespace Improbable.Stdlib
                 throw new Exception("Not connected to SpatialOS");
             }
 
-            lock (connection)
+            lock (connectionLock)
             {
                 connection.SendMetrics(metrics);
             }
@@ -560,7 +565,7 @@ namespace Improbable.Stdlib
                 throw new Exception("Not connected to SpatialOS");
             }
 
-            lock (connection)
+            lock (connectionLock)
             {
                 return new OpList(connection.GetOpList((uint) timeout.TotalMilliseconds));
             }
@@ -589,7 +594,7 @@ namespace Improbable.Stdlib
 
                 try
                 {
-                    lock (connection)
+                    lock (connectionLock)
                     {
                         opList = new OpList(connection.GetOpList((uint) timeout.TotalMilliseconds));
                     }
@@ -615,7 +620,7 @@ namespace Improbable.Stdlib
                 throw new Exception("Not connected to SpatialOS");
             }
 
-            lock (connection)
+            lock (connectionLock)
             {
                 return connection.GetWorkerFlag(flagName);
             }
