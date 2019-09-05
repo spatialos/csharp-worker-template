@@ -29,7 +29,8 @@ namespace Improbable.Stdlib.CSharpCodeGen
             sb.AppendLine(GenerateCommands(type, bundle.Components[type.QualifiedName].Commands));
             if (!type.IsRestricted)
             {
-                sb.AppendLine(GenerateUpdate(type));
+                // Workers can't construct or send updates for restricted components.
+                sb.AppendLine(GenerateSendUpdate(type));
             }
 
             sb.AppendLine(GenerateComponentCollection(type));
@@ -201,7 +202,7 @@ public static CommandSenderBinding Bind({WorkerConnectionType} connection, {Type
             return text.ToString();
         }
 
-        public static string GenerateUpdate(TypeDescription type)
+        public static string GenerateSendUpdate(TypeDescription type)
         {
             var typeName = Case.GetPascalCaseNameFromTypeName(type.QualifiedName);
             var typeNamespace = Case.GetPascalCaseNamespaceFromTypeName(type.QualifiedName);

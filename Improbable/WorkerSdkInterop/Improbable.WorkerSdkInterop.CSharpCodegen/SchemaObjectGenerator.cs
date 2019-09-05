@@ -38,6 +38,7 @@ namespace Improbable.WorkerSdkInterop.CSharpCodeGen
 
                 if (!type.IsRestricted)
                 {
+                    // Workers can't construct or send updates for restricted components.
                     content.AppendLine(GenerateUpdateStruct(type, type.Fields));
                 }
             }

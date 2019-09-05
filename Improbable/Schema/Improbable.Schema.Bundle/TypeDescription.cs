@@ -28,6 +28,10 @@ namespace Improbable.Schema.Bundle
 
         public readonly uint? ComponentId;
 
+        /// <summary>
+        /// If true, this is a restricted Improbable component, which workers can never gain authority over.
+        /// Code generators can use this to avoid generating code that may be nonsensical or confusing.
+        /// </summary>
         public readonly bool IsRestricted;
 
         public TypeDescription(string qualifiedName, Bundle bundle)
