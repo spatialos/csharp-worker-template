@@ -22,7 +22,6 @@ namespace Improbable.Stdlib
         private Task metricsTask;
         private CancellationTokenSource metricsTcs = new CancellationTokenSource();
         private string workerId;
-
         private WorkerConnection(Connection connection)
         {
             this.connection = connection ?? throw new ArgumentNullException(nameof(connection));
