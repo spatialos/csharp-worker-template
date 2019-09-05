@@ -9,6 +9,7 @@ namespace Improbable.Stdlib.CSharpCodeGen
     {
         private const string WorkerConnectionType = "global::Improbable.Stdlib.WorkerConnection";
         private const string CancellationTokenType = "global::System.Threading.CancellationToken";
+
         private readonly Bundle bundle;
 
         public StdlibGenerator(Bundle bundle)
@@ -26,7 +27,11 @@ namespace Improbable.Stdlib.CSharpCodeGen
             var sb = new StringBuilder();
 
             sb.AppendLine(GenerateCommands(type, bundle.Components[type.QualifiedName].Commands));
-            sb.AppendLine(GenerateUpdate(type));
+            if (!type.IsRestricted)
+            {
+                sb.AppendLine(GenerateUpdate(type));
+            }
+
             sb.AppendLine(GenerateComponentCollection(type));
 
             return sb.ToString();
@@ -38,9 +43,9 @@ namespace Improbable.Stdlib.CSharpCodeGen
             var collectionType = $"global::Improbable.Stdlib.ComponentCollection<global::{name}>";
 
             return $@"public static {collectionType} CreateComponentCollection()
-            {{
-                return new {collectionType}(ComponentId, Create, ApplyUpdate);
-            }}";
+{{
+    return new {collectionType}(ComponentId, Create, ApplyUpdate);
+}}";
         }
 
         private static string GenerateCommands(TypeDescription type, IReadOnlyList<ComponentDefinition.CommandDefinition> commands)
@@ -58,31 +63,70 @@ namespace Improbable.Stdlib.CSharpCodeGen
 
                 commandIndices.AppendLine($"{cmdName} = {cmd.CommandIndex},");
 
-                bindingMethods.AppendLine($@"public global::System.Threading.Tasks.Task<{response}> Send{cmdName}Async({request} request, {CancellationTokenType} cancellation = default, uint? timeout = null, global::Improbable.Worker.CInterop.CommandParameters? parameters = null)
-{{
-    return global::{Case.CapitalizeNamespace(type.QualifiedName)}.Send{cmdName}Async(connection, entityId, request, cancellation, timeout, parameters);
-}}
+                var boundResponseSender = "";
 
-public void Send{cmdName}Response(uint id, {response} response)
+                // Don't allow workers to send command responses for system commands.
+                if (!type.IsRestricted)
+                {
+                    boundResponseSender = $@"public void Send{cmdName}Response(uint id, {response} response)
 {{
     global::{Case.CapitalizeNamespace(type.QualifiedName)}.Send{cmdName}Response(connection, id, response);
-}}
-");
+}}";
+                }
 
-                text.AppendLine($@"public static void Send{cmdName}Response({WorkerConnectionType} connection, uint id, {response} response)
+                bindingMethods.AppendLine($@"
+/// <summary>
+/// Sends a command to the worker that is authoritative over the bound entityId./>.
+/// </summary>
+/// <param name=""request""> The request payload.</param>
+/// <param name=""cancellation""> A token used to mark the task as cancelled.
+/// Cancelling will NOT cancel the sending of the command to the authoritative worker; it WILL be processed by the runtime and the target worker.
+/// It only marks the task as cancelled locally. Use this for flow control or cleanup of state.
+/// </param>
+/// <param name=""timeout""> The amount of time that must pass before a command response is considered ""timed out"".</param>
+/// <param name=""commandParameters""> Options used to configure how the command is sent. </param>
+/// <returns> A Task containing response payload. </returns>
+public global::System.Threading.Tasks.Task<{response}> Send{cmdName}Async({request} request, {CancellationTokenType} cancellation = default, uint? timeout = null, global::Improbable.Worker.CInterop.CommandParameters? commandParameters = null)
+{{
+    return global::{Case.CapitalizeNamespace(type.QualifiedName)}.Send{cmdName}Async(connection, entityId, request, cancellation, timeout, commandParameters);
+}}
+{boundResponseSender}");
+                var responseSender = "";
+
+                // Don't allow workers to send command responses for system commands.
+                if (!type.IsRestricted)
+                {
+                    responseSender = $@"public static void Send{cmdName}Response({WorkerConnectionType} connection, uint id, {response} response)
 {{
     var schemaResponse = new global::Improbable.Worker.CInterop.SchemaCommandResponse({componentName}.ComponentId, {cmd.CommandIndex});
     response.ApplyToSchemaObject(schemaResponse.GetObject());
 
     connection.SendCommandResponse(id, schemaResponse);
 }}
+";
+                }
 
+                text.AppendLine($@"{responseSender}
+/// <summary>
+/// Sends a command to the worker that is authoritative over <paramref name=""entityId""/>.
+/// </summary>
+/// <param name=""connection""> </param>
+/// <param name=""entityId""> </param>
+/// <param name=""request""> The request payload.</param>
+/// <param name=""cancellation""> A token used to mark the task as cancelled.
+/// Cancelling will NOT cancel the sending of the command to the authoritative worker; it WILL be processed by the runtime and the target worker.
+/// It only marks the task as cancelled locally. Use this for flow control or cleanup of state.
+/// </param>
+/// <param name=""timeout""> The amount of time that must pass before a command response is considered ""timed out"".</param>
+/// <param name=""commandParameters""> Options used to configure how the command is sent. </param>
+/// <param name=""taskOptions""> Options that control how the task is scheduled and executed. </param>
+/// <returns> A Task containing response payload. </returns>
 public static global::System.Threading.Tasks.Task<{response}> Send{cmdName}Async({WorkerConnectionType} connection,
                                                                                  {Types.EntityIdType} entityId,
                                                                                  {request} request,
                                                                                  {CancellationTokenType} cancellation = default,
                                                                                  uint? timeout = null,
-                                                                                 global::Improbable.Worker.CInterop.CommandParameters? parameters = null,
+                                                                                 global::Improbable.Worker.CInterop.CommandParameters? commandParameters = null,
                                                                                  global::System.Threading.Tasks.TaskCreationOptions taskOptions = global::System.Threading.Tasks.TaskCreationOptions.RunContinuationsAsynchronously)
 {{
     var schemaRequest = new global::Improbable.Worker.CInterop.SchemaCommandRequest({componentName}.ComponentId, {cmd.CommandIndex});
@@ -105,7 +149,7 @@ public static global::System.Threading.Tasks.Task<{response}> Send{cmdName}Async
         completion.TrySetException(new global::Improbable.Stdlib.CommandFailedException(code, message));
     }}
 
-    connection.Send(entityId, schemaRequest, timeout, parameters, Complete, Fail);
+    connection.Send(entityId, schemaRequest, timeout, commandParameters, Complete, Fail);
 
     return completion.Task;
 }}");

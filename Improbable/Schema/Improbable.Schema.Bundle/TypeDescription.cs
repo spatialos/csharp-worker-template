@@ -28,9 +28,13 @@ namespace Improbable.Schema.Bundle
 
         public readonly uint? ComponentId;
 
+        public readonly bool IsRestricted;
+
         public TypeDescription(string qualifiedName, Bundle bundle)
         {
             QualifiedName = qualifiedName;
+
+            IsRestricted = qualifiedName.StartsWith("improbable.restricted");
 
             NestedEnums = bundle.Enums.Where(e => e.Value.OuterType == qualifiedName).Select(type => bundle.Enums[type.Key]).ToList();
 

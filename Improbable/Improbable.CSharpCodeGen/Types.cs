@@ -275,6 +275,30 @@ namespace Improbable.CSharpCodeGen
             }
         }
 
+        public static string EmptyCollection(TypeDescription type, FieldDefinition field)
+        {
+            switch (field.TypeSelector)
+            {
+                case FieldType.List:
+                    if (IsFieldRecursive(type, field))
+                    {
+                        return $"new global::System.Collections.Generic.List<{TypeReferenceToType(field.ListType.InnerType)}>()";
+                    }
+
+                    return $"global::System.Collections.Immutable.ImmutableArray<{TypeReferenceToType(field.ListType.InnerType)}>.Empty";
+
+                case FieldType.Map:
+                    if (IsFieldRecursive(type, field))
+                    {
+                        return $"new global::System.Collections.Generic.Dictionary<{TypeReferenceToType(field.MapType.KeyType)}, {TypeReferenceToType(field.MapType.ValueType)}>()";
+                    }
+
+                    return $"global::System.Collections.Immutable.ImmutableDictionary<{TypeReferenceToType(field.MapType.KeyType)}, {TypeReferenceToType(field.MapType.ValueType)}>.Empty";
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(field.TypeSelector));
+            }
+        }
+
         public static string ParameterConversion(TypeDescription type, FieldDefinition field)
         {
             switch (field.TypeSelector)
@@ -284,21 +308,16 @@ namespace Improbable.CSharpCodeGen
                     {
                         return $"new global::System.Collections.Generic.List<{TypeReferenceToType(field.ListType.InnerType)}>({FieldNameToSafeName(SnakeCaseToCamelCase(field.Name))})";
                     }
-                    else
-                    {
-                        return $"global::System.Collections.Immutable.ImmutableArray.ToImmutableArray({FieldNameToSafeName(SnakeCaseToCamelCase(field.Name))})";
-                    }
+
+                    return $"global::System.Collections.Immutable.ImmutableArray.ToImmutableArray({FieldNameToSafeName(SnakeCaseToCamelCase(field.Name))})";
 
                 case FieldType.Map:
                     if (IsFieldRecursive(type, field))
                     {
                         return $"global::System.Linq.Enumerable.ToDictionary({FieldNameToSafeName(SnakeCaseToCamelCase(field.Name))}, kv => kv.Key, kv => kv.Value)";
                     }
-                    else
-                    {
-                        return $"global::System.Collections.Immutable.ImmutableDictionary.ToImmutableDictionary({FieldNameToSafeName(SnakeCaseToCamelCase(field.Name))})";
-                    }
 
+                    return $"global::System.Collections.Immutable.ImmutableDictionary.ToImmutableDictionary({FieldNameToSafeName(SnakeCaseToCamelCase(field.Name))} )";
                 default:
                     return $"{FieldNameToSafeName(SnakeCaseToCamelCase(field.Name))}";
             }
