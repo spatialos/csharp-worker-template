@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using Improbable.SpatialOS.Deployment.V1Alpha1;
+using Improbable.Stdlib.Project;
 
 namespace Improbable.Stdlib.Platform
 {

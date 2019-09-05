@@ -1,7 +1,7 @@
 using System.Collections.Immutable;
 using Newtonsoft.Json;
 
-namespace Improbable.Stdlib.Platform
+namespace Improbable.Stdlib.Project
 {
     /// <summary>
     /// This is an incomplete API. Fields will be added as needed.

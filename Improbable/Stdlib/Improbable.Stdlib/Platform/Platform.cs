@@ -13,6 +13,7 @@ using Google.Protobuf.WellKnownTypes;
 using Improbable.SpatialOS.Deployment.V1Alpha1;
 using Improbable.SpatialOS.Platform.Common;
 using Improbable.SpatialOS.PlayerAuth.V2Alpha1;
+using Improbable.Stdlib.Project;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 

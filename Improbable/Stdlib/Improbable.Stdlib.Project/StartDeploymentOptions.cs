@@ -5,7 +5,7 @@ using System.IO;
 using System.Text;
 using Newtonsoft.Json;
 
-namespace Improbable.Stdlib.Platform
+namespace Improbable.Stdlib.Project
 {
     public readonly struct StartDeploymentOptions
     {
