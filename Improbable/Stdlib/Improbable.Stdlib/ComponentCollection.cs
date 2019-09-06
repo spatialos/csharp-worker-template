@@ -1,8 +1,17 @@
+using System;
 using System.Collections.Generic;
+using System.Linq;
 using Improbable.Worker.CInterop;
 
 namespace Improbable.Stdlib
 {
+    /// <summary>
+    /// Contains a collection of components.
+    /// </summary>
+    /// <remarks>
+    /// This class is not thread-safe. It is up to the owner of each instance to coordinate multi-threaded access.
+    /// </remarks>
+    /// <typeparam name="TComponent"></typeparam>
     public class ComponentCollection<TComponent> : IOpProcessor where TComponent : struct
     {
         public delegate TComponent CreateDelegate(SchemaComponentData? data);
