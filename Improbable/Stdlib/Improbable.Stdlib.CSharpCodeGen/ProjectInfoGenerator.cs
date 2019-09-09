@@ -1,5 +1,4 @@
 
-using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -16,11 +15,10 @@ namespace Improbable.Stdlib.CSharpCodeGen
         public string GenerateProjectInfo(string pathToSpatialOsJson, string ns = "SpatialOsProject")
         {
             var project = JsonConvert.DeserializeObject<ProjectConfig>(File.ReadAllText(pathToSpatialOsJson, Encoding.UTF8));
-            var configDir = Path.GetDirectoryName(pathToSpatialOsJson) ?? Environment.CurrentDirectory;
+            var configDir = Path.GetDirectoryName(pathToSpatialOsJson) ?? string.Empty;
 
             var layers = new HashSet<string>();
             var workerTypes = new HashSet<string>();
-            var mapping = new Dictionary<string, List<string>>();
 
             foreach (var workerPath in project.ClientWorkers.Union(project.ServerWorkers))
             {
@@ -29,13 +27,6 @@ namespace Improbable.Stdlib.CSharpCodeGen
 
                 layers.Add(workerConfig.Layer);
                 workerTypes.Add(workerConfig.WorkerType);
-
-                if (!mapping.TryGetValue(workerConfig.Layer, out var layer))
-                {
-                    layer = mapping[workerConfig.Layer] = new List<string>();
-                }
-
-                layer.Add(workerConfig.WorkerType);
             }
 
             return $@"namespace {ns}
@@ -50,10 +41,9 @@ namespace Improbable.Stdlib.CSharpCodeGen
 
     public static class Layers
     {{
-{Indent(2, string.Join("\n", mapping.Keys.Select(layer => $@"public static string {SnakeCaseToPascalCase(layer)} = ""{layer}"";")))}
+{Indent(2, string.Join("\n", layers.Select(layer => $@"public static string {SnakeCaseToPascalCase(layer)} = ""{layer}"";")))}
     }}
 }}";
-
         }
     }
 }
