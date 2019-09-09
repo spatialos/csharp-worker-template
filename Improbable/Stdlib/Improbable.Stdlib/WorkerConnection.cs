@@ -21,7 +21,7 @@ namespace Improbable.Stdlib
         private Task metricsTask;
         private CancellationTokenSource metricsTcs = new CancellationTokenSource();
         private string workerId;
-        private object connectionLock = new object();
+        private readonly object connectionLock = new object();
 
         private WorkerConnection(Connection connection)
         {
@@ -72,110 +72,51 @@ namespace Improbable.Stdlib
             }
         }
 
-        public static Task<WorkerConnection> ConnectAsync(string host, ushort port, string workerName, ConnectionParameters connectionParameters, CancellationToken cancellation = default)
+        public static async Task<WorkerConnection> ConnectAsync(string host, ushort port, string workerName, ConnectionParameters connectionParameters, CancellationToken cancellation = default)
         {
-            var tcs = new TaskCompletionSource<WorkerConnection>();
-            if (cancellation.CanBeCanceled)
+            using (var future = Connection.ConnectAsync(host, port, workerName, connectionParameters))
             {
-                cancellation.Register(() => tcs.TrySetCanceled(cancellation));
+                var connection = await future.ToTask(cancellation);
+
+                if (connection.GetConnectionStatusCode() != ConnectionStatusCode.Success)
+                {
+                    throw new Exception($"{connection.GetConnectionStatusCode()}: {connection.GetConnectionStatusCodeDetailString()}");
+                }
+
+                return new WorkerConnection(connection);
             }
-
-            Task.Factory.StartNew(() =>
-            {
-                try
-                {
-                    using (var future = Connection.ConnectAsync(host, port, workerName, connectionParameters))
-                    {
-                        Connection connection;
-                        while (true)
-                        {
-                            cancellation.ThrowIfCancellationRequested();
-
-                            if (future.TryGet(out connection, 50))
-                            {
-                                break;
-                            }
-                        }
-
-
-                        if (connection.GetConnectionStatusCode() != ConnectionStatusCode.Success)
-                        {
-                            tcs.SetException(new Exception($"{connection.GetConnectionStatusCode()}: {connection.GetConnectionStatusCodeDetailString()}"));
-                        }
-                        else
-                        {
-                            tcs.SetResult(new WorkerConnection(connection));
-                        }
-                    }
-                }
-                catch (Exception e)
-                {
-                    tcs.TrySetException(e);
-                }
-            }, cancellation);
-
-            return tcs.Task;
         }
 
-        private static Task<WorkerConnection> ConnectAsync(ILocatorOptions options, ConnectionParameters connectionParameters, CancellationToken cancellation = default)
+        public static async Task<WorkerConnection> ConnectAsync(ILocatorOptions options, ConnectionParameters connectionParameters, CancellationToken cancellation = default)
         {
-            var tcs = new TaskCompletionSource<WorkerConnection>();
-            if (cancellation.CanBeCanceled)
+            var pit = GetDevelopmentPlayerIdentityToken(options.SpatialOsHost, options.SpatialOsPort, options.UseInsecureConnection, options.DevToken, options.PlayerId, options.DisplayName);
+            var loginTokens = GetDevelopmentLoginTokens(options.SpatialOsHost, options.SpatialOsPort, options.UseInsecureConnection, connectionParameters.WorkerType, pit);
+            var loginToken = loginTokens.First().LoginToken;
+
+            var locatorParameters = new LocatorParameters
             {
-                cancellation.Register(() => tcs.TrySetCanceled(cancellation));
+                PlayerIdentity = new PlayerIdentityCredentials
+                {
+                    LoginToken = loginToken,
+                    PlayerIdentityToken = pit
+                },
+                UseInsecureConnection = options.UseInsecureConnection,
+                Logging = connectionParameters.ProtocolLogging,
+                EnableLogging = connectionParameters.EnableProtocolLoggingAtStartup
+            };
+
+            using (var locator = new Locator(options.SpatialOsHost, options.SpatialOsPort, locatorParameters))
+            using (var future = locator.ConnectAsync(connectionParameters))
+            {
+                var connection = await future.ToTask(cancellation);
+
+                if (connection != null && connection.GetConnectionStatusCode() != ConnectionStatusCode.Success)
+                {
+                    throw new Exception($"{connection.GetConnectionStatusCode()}: {connection.GetConnectionStatusCodeDetailString()}");
+                }
+
+                return new WorkerConnection(connection);
             }
-
-            Task.Factory.StartNew(() =>
-            {
-                try
-                {
-                    var pit = GetDevelopmentPlayerIdentityToken(options.SpatialOsHost, options.SpatialOsPort, options.UseInsecureConnection, options.DevToken, options.PlayerId, options.DisplayName);
-                    var loginTokens = GetDevelopmentLoginTokens(options.SpatialOsHost, options.SpatialOsPort, options.UseInsecureConnection, connectionParameters.WorkerType, pit);
-                    var loginToken = loginTokens.First().LoginToken;
-
-                    var locatorParameters = new LocatorParameters
-                    {
-                        PlayerIdentity = new PlayerIdentityCredentials
-                        {
-                            LoginToken = loginToken,
-                            PlayerIdentityToken = pit
-                        },
-                        UseInsecureConnection = options.UseInsecureConnection,
-                        Logging = connectionParameters.ProtocolLogging,
-                        EnableLogging = connectionParameters.EnableProtocolLoggingAtStartup
-                    };
-
-                    using (var locator = new Locator(options.SpatialOsHost, options.SpatialOsPort, locatorParameters))
-                    using (var future = locator.ConnectAsync(connectionParameters))
-                    {
-                        Connection connection;
-                        while (true)
-                        {
-                            cancellation.ThrowIfCancellationRequested();
-
-                            if (future.TryGet(out connection, 50))
-                            {
-                                break;
-                            }
-                        }
-
-                        if (connection != null && connection.GetConnectionStatusCode() != ConnectionStatusCode.Success)
-                        {
-                            tcs.SetException(new Exception($"{connection.GetConnectionStatusCode()}: {connection.GetConnectionStatusCodeDetailString()}"));
-                        }
-                        else
-                        {
-                            tcs.SetResult(new WorkerConnection(connection));
-                        }
-                    }
-                }
-                catch (Exception e)
-                {
-                    tcs.TrySetException(e);
-                }
-            }, cancellation);
-
-            return tcs.Task;
         }
 
         public void StartSendingMetrics(params Action<Metrics>[] updaterList)
@@ -624,7 +565,7 @@ namespace Improbable.Stdlib
             {
                 CancelCommands();
 
-                throw new Exception("Not connected to SpatialOS");
+                throw new InvalidOperationException("Not connected to SpatialOS");
             }
         }
 
