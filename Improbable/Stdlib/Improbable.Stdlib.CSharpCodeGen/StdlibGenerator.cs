@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Text;
 using Improbable.CSharpCodeGen;
 using Improbable.Schema.Bundle;
+using static Improbable.CSharpCodeGen.Case;
 
 namespace Improbable.Stdlib.CSharpCodeGen
 {
@@ -31,6 +32,7 @@ namespace Improbable.Stdlib.CSharpCodeGen
             {
                 // Workers can't construct or send updates for restricted components.
                 sb.AppendLine(GenerateSendUpdate(type));
+                sb.AppendLine(GenerateEventProcessors(type));
             }
 
             sb.AppendLine(GenerateComponentCollection(type));
@@ -40,13 +42,37 @@ namespace Improbable.Stdlib.CSharpCodeGen
 
         private static string GenerateComponentCollection(TypeDescription type)
         {
-            var name = Case.CapitalizeNamespace(type.QualifiedName);
+            var name = CapitalizeNamespace(type.QualifiedName);
             var collectionType = $"global::Improbable.Stdlib.ComponentCollection<global::{name}>";
 
             return $@"public static {collectionType} CreateComponentCollection()
 {{
     return new {collectionType}(ComponentId, Create, ApplyUpdate);
 }}";
+        }
+
+        private static string GenerateEventProcessors(TypeDescription type)
+        {
+            if (type.Events == null || type.Events.Count == 0)
+            {
+                return string.Empty;
+            }
+
+            var sb = new StringBuilder();
+            foreach (var evt in type.Events)
+            {
+                var name = SnakeCaseToPascalCase(evt.Name);
+                var eventType = CapitalizeNamespace(evt.Type);
+                var events = $"global::Improbable.Stdlib.EventProcessor<global::{eventType}>";
+
+                sb.AppendLine($@"public static {events} Create{name}EventProcessor()
+{{
+    return new {events}(ComponentId, TryGetEvents);
+}}");
+
+            }
+
+            return sb.ToString();
         }
 
         private static string GenerateCommands(TypeDescription type, IReadOnlyList<ComponentDefinition.CommandDefinition> commands)
@@ -137,7 +163,7 @@ public static global::System.Threading.Tasks.Task<{response}> Send{cmdName}Async
     if (cancellation.CanBeCanceled)
     {{
         cancellation.Register(() => completion.TrySetCanceled(cancellation));
-    }}    
+    }}
 
     void Complete(global::Improbable.Stdlib.WorkerConnection.CommandResponses r)
     {{
