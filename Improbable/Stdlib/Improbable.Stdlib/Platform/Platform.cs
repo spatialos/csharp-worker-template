@@ -9,7 +9,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using Google.Api.Gax;
 using Google.Api.Gax.Grpc;
+using Google.LongRunning;
 using Google.Protobuf.WellKnownTypes;
+using Grpc.Core;
 using Improbable.SpatialOS.Deployment.V1Alpha1;
 using Improbable.SpatialOS.Platform.Common;
 using Improbable.SpatialOS.PlayerAuth.V2Alpha1;
@@ -88,41 +90,56 @@ namespace Improbable.Stdlib.Platform
             {
                 progress?.Report("Starting Spatial service...");
                 Shell.Run("spatial", progress, "service", "start", "--json_output", "--main_config", Shell.Escape(startDeployment.ProjectConfigPath));
-
-                // Workaround until WF-1646 is fixed.
-                progress?.Report("Sleeping to let Spatial start up...");
-                await Task.Delay(TimeSpan.FromSeconds(1), cancellation);
             }
 
             // Shut down any currently-running local deployments...
             await StopLocalAsync(startDeployment.ProjectConfig, cancellation, progress);
 
-            var snapshotFile = Path.Combine(Path.GetDirectoryName(startDeployment.ProjectConfigPath), "snapshots", $"{startDeployment.SnapshotId}.snapshot");
+            var snapshotFile = Path.Combine(Path.GetDirectoryName(startDeployment.ProjectConfigPath) ?? "", "snapshots", $"{startDeployment.SnapshotId}.snapshot");
             if (!File.Exists(snapshotFile))
             {
                 throw new FileNotFoundException(snapshotFile);
             }
 
-            progress?.Report($"Starting local deployment for '{project.ProjectName}' with snapshot '{startDeployment.SnapshotId}'...");
-            var response = client.CreateDeployment(new CreateDeploymentRequest
-            {
-                Deployment = new Deployment
-                {
-                    Tag = {startDeployment.Tags},
-                    Name = "local",
-                    StartingSnapshotId = startDeployment.SnapshotId,
-                    ProjectName = project.ProjectName,
-                    LaunchConfig = new SpatialOS.Deployment.V1Alpha1.LaunchConfig
-                    {
-                        ConfigJson = File.ReadAllText(splConfigPath)
-                    }
-                }
-            }, CallSettings.FromCancellationToken(cancellation))
-                .PollUntilCompleted(defaultPoll);
+            var retries = 10;
 
-            if (response.IsFaulted)
+            Operation<Deployment, CreateDeploymentMetadata> response;
+
+            while (true)
             {
-                throw response.Exception;
+                progress?.Report($"Starting local deployment for '{project.ProjectName}' with snapshot '{startDeployment.SnapshotId}'...");
+
+                response = client.CreateDeployment(new CreateDeploymentRequest
+                    {
+                        Deployment = new Deployment
+                        {
+                            Tag = { startDeployment.Tags },
+                            Name = "local",
+                            StartingSnapshotId = startDeployment.SnapshotId,
+                            ProjectName = project.ProjectName,
+                            LaunchConfig = new SpatialOS.Deployment.V1Alpha1.LaunchConfig
+                            {
+                                ConfigJson = File.ReadAllText(splConfigPath)
+                            }
+                        }
+                    }, CallSettings.FromCancellationToken(cancellation))
+                    .PollUntilCompleted(defaultPoll);
+
+                if (!response.IsFaulted)
+                {
+                    break;
+                }
+
+                if (retries <= 0)
+                {
+                    throw response.Exception;
+                }
+                
+                retries--;
+
+                // Workaround until WF-1646 is fixed.
+                progress?.Report("Sleeping to let Spatial start up...");
+                await Task.Delay(TimeSpan.FromSeconds(1), cancellation);
             }
 
             // Apply desired starting worker flags.
