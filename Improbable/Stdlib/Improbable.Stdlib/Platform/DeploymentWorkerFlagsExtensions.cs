@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Improbable.SpatialOS.Deployment.V1Alpha1;
 
-namespace Improbable.Stdlib.Platform
+namespace Improbable.Stdlib.Project
 {
     public static class DeploymentWorkerFlagsExtensions
     {
