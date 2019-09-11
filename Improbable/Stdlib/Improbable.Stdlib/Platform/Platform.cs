@@ -109,32 +109,37 @@ namespace Improbable.Stdlib.Platform
             {
                 progress?.Report($"Starting local deployment for '{project.ProjectName}' with snapshot '{startDeployment.SnapshotId}'...");
 
-                response = client.CreateDeployment(new CreateDeploymentRequest
-                    {
-                        Deployment = new Deployment
-                        {
-                            Tag = { startDeployment.Tags },
-                            Name = "local",
-                            StartingSnapshotId = startDeployment.SnapshotId,
-                            ProjectName = project.ProjectName,
-                            LaunchConfig = new SpatialOS.Deployment.V1Alpha1.LaunchConfig
-                            {
-                                ConfigJson = File.ReadAllText(splConfigPath)
-                            }
-                        }
-                    }, CallSettings.FromCancellationToken(cancellation))
-                    .PollUntilCompleted(defaultPoll);
-
-                if (!response.IsFaulted)
+                try
                 {
+                    response = client.CreateDeployment(new CreateDeploymentRequest
+                        {
+                            Deployment = new Deployment
+                            {
+                                Tag = { startDeployment.Tags },
+                                Name = "local",
+                                StartingSnapshotId = startDeployment.SnapshotId,
+                                ProjectName = project.ProjectName,
+                                LaunchConfig = new SpatialOS.Deployment.V1Alpha1.LaunchConfig
+                                {
+                                    ConfigJson = File.ReadAllText(splConfigPath)
+                                }
+                            }
+                        }, CallSettings.FromCancellationToken(cancellation))
+                        .PollUntilCompleted(defaultPoll);
+
                     break;
                 }
-
-                if (retries <= 0)
+                catch (RpcException e)
                 {
-                    throw response.Exception;
+                    // The create command currently returns before the system is completely setup.
+                    // If that's the case, the error will be something like "Grpc.Core.RpcException : Status(StatusCode=Unavailable, Detail="snapshot of id test is not valid; all SubConns are in TransientFailure")"
+                    // Retry in this case.
+                    if (e.Status.StatusCode != StatusCode.Unavailable || retries <= 0)
+                    {
+                        throw;
+                    }
                 }
-                
+
                 retries--;
 
                 // Workaround until WF-1646 is fixed.
