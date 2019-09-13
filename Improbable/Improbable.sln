@@ -53,6 +53,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Improbable.WorkerSdkInterop
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Improbable.Test", "Test\Improbable.Test\Improbable.Test.csproj", "{6FF85682-1D01-49FA-A504-2CD4BF304E1E}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Improbable.Stdlib.Test", "Improbable.Stdlib.Test\Improbable.Stdlib.Test.csproj", "{25D89DC8-6388-468C-9E1C-89EBC2896783}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -185,6 +187,12 @@ Global
 		{6FF85682-1D01-49FA-A504-2CD4BF304E1E}.Release|Any CPU.ActiveCfg = Release|x64
 		{6FF85682-1D01-49FA-A504-2CD4BF304E1E}.Release|x64.ActiveCfg = Release|x64
 		{6FF85682-1D01-49FA-A504-2CD4BF304E1E}.Release|x64.Build.0 = Release|x64
+		{25D89DC8-6388-468C-9E1C-89EBC2896783}.Debug|Any CPU.ActiveCfg = Debug|x64
+		{25D89DC8-6388-468C-9E1C-89EBC2896783}.Debug|x64.ActiveCfg = Debug|x64
+		{25D89DC8-6388-468C-9E1C-89EBC2896783}.Debug|x64.Build.0 = Debug|x64
+		{25D89DC8-6388-468C-9E1C-89EBC2896783}.Release|Any CPU.ActiveCfg = Release|x64
+		{25D89DC8-6388-468C-9E1C-89EBC2896783}.Release|x64.ActiveCfg = Release|x64
+		{25D89DC8-6388-468C-9E1C-89EBC2896783}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -205,6 +213,7 @@ Global
 		{DE68E982-D876-42EA-B1CA-66EB1F00D9FE} = {4C18BB52-B769-434C-9FB9-FF4F6BFF7CD2}
 		{BE41E27A-B0B2-4FE7-A38C-9E706EB4F78F} = {35DD8D83-78D8-4047-8D20-17A1AF6F31DD}
 		{6FF85682-1D01-49FA-A504-2CD4BF304E1E} = {4C18BB52-B769-434C-9FB9-FF4F6BFF7CD2}
+		{25D89DC8-6388-468C-9E1C-89EBC2896783} = {1E8DCCB5-D990-47E1-9CC9-74ECC59FE2FB}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {A491C2CA-7589-48AD-9D56-4ED9B84329FE}
