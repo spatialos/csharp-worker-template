@@ -9,6 +9,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\Improbable.CSharpCodeGen\Improbable.CSharpCodeGen.csproj" />
     <ProjectReference Include="..\..\Schema\Improbable.Schema.Bundle\Improbable.Schema.Bundle.csproj" />
+    <ProjectReference Include="..\Improbable.Stdlib\Improbable.Stdlib.csproj" />
   </ItemGroup>
 
 </Project>

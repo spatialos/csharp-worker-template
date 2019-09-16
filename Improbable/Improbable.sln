@@ -55,6 +55,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Improbable.Test", "Test\Imp
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Improbable.Stdlib.Test", "Improbable.Stdlib.Test\Improbable.Stdlib.Test.csproj", "{25D89DC8-6388-468C-9E1C-89EBC2896783}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QueryRunner", "QueryRunner\QueryRunner.csproj", "{625B86C4-3164-41BC-8CC1-1193C013444B}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -193,6 +195,14 @@ Global
 		{25D89DC8-6388-468C-9E1C-89EBC2896783}.Release|Any CPU.ActiveCfg = Release|x64
 		{25D89DC8-6388-468C-9E1C-89EBC2896783}.Release|x64.ActiveCfg = Release|x64
 		{25D89DC8-6388-468C-9E1C-89EBC2896783}.Release|x64.Build.0 = Release|x64
+		{625B86C4-3164-41BC-8CC1-1193C013444B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{625B86C4-3164-41BC-8CC1-1193C013444B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{625B86C4-3164-41BC-8CC1-1193C013444B}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{625B86C4-3164-41BC-8CC1-1193C013444B}.Debug|x64.Build.0 = Debug|Any CPU
+		{625B86C4-3164-41BC-8CC1-1193C013444B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{625B86C4-3164-41BC-8CC1-1193C013444B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{625B86C4-3164-41BC-8CC1-1193C013444B}.Release|x64.ActiveCfg = Release|Any CPU
+		{625B86C4-3164-41BC-8CC1-1193C013444B}.Release|x64.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
