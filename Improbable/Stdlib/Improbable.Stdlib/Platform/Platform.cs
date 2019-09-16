@@ -9,10 +9,13 @@ using System.Threading;
 using System.Threading.Tasks;
 using Google.Api.Gax;
 using Google.Api.Gax.Grpc;
+using Google.LongRunning;
 using Google.Protobuf.WellKnownTypes;
+using Grpc.Core;
 using Improbable.SpatialOS.Deployment.V1Alpha1;
 using Improbable.SpatialOS.Platform.Common;
 using Improbable.SpatialOS.PlayerAuth.V2Alpha1;
+using Improbable.Stdlib.Project;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -87,41 +90,61 @@ namespace Improbable.Stdlib.Platform
             {
                 progress?.Report("Starting Spatial service...");
                 Shell.Run("spatial", progress, "service", "start", "--json_output", "--main_config", Shell.Escape(startDeployment.ProjectConfigPath));
-
-                // Workaround until WF-1646 is fixed.
-                progress?.Report("Sleeping to let Spatial start up...");
-                await Task.Delay(TimeSpan.FromSeconds(1), cancellation);
             }
 
             // Shut down any currently-running local deployments...
             await StopLocalAsync(startDeployment.ProjectConfig, cancellation, progress);
 
-            var snapshotFile = Path.Combine(Path.GetDirectoryName(startDeployment.ProjectConfigPath), "snapshots", $"{startDeployment.SnapshotId}.snapshot");
+            var snapshotFile = Path.Combine(Path.GetDirectoryName(startDeployment.ProjectConfigPath) ?? "", "snapshots", $"{startDeployment.SnapshotId}.snapshot");
             if (!File.Exists(snapshotFile))
             {
                 throw new FileNotFoundException(snapshotFile);
             }
 
-            progress?.Report($"Starting local deployment for '{project.ProjectName}' with snapshot '{startDeployment.SnapshotId}'...");
-            var response = client.CreateDeployment(new CreateDeploymentRequest
+            var retries = 10;
+
+            Operation<Deployment, CreateDeploymentMetadata> response;
+
+            while (true)
             {
-                Deployment = new Deployment
+                progress?.Report($"Starting local deployment for '{project.ProjectName}' with snapshot '{startDeployment.SnapshotId}'...");
+
+                try
                 {
-                    Tag = {startDeployment.Tags},
-                    Name = "local",
-                    StartingSnapshotId = startDeployment.SnapshotId,
-                    ProjectName = project.ProjectName,
-                    LaunchConfig = new SpatialOS.Deployment.V1Alpha1.LaunchConfig
+                    response = client.CreateDeployment(new CreateDeploymentRequest
+                        {
+                            Deployment = new Deployment
+                            {
+                                Tag = { startDeployment.Tags },
+                                Name = "local",
+                                StartingSnapshotId = startDeployment.SnapshotId,
+                                ProjectName = project.ProjectName,
+                                LaunchConfig = new SpatialOS.Deployment.V1Alpha1.LaunchConfig
+                                {
+                                    ConfigJson = File.ReadAllText(splConfigPath)
+                                }
+                            }
+                        }, CallSettings.FromCancellationToken(cancellation))
+                        .PollUntilCompleted(defaultPoll);
+
+                    break;
+                }
+                catch (RpcException e)
+                {
+                    // The create command currently returns before the system is completely setup.
+                    // If that's the case, the error will be something like "Grpc.Core.RpcException : Status(StatusCode=Unavailable, Detail="snapshot of id test is not valid; all SubConns are in TransientFailure")"
+                    // Retry in this case.
+                    if (e.Status.StatusCode != StatusCode.Unavailable || retries <= 0)
                     {
-                        ConfigJson = File.ReadAllText(splConfigPath)
+                        throw;
                     }
                 }
-            }, CallSettings.FromCancellationToken(cancellation))
-                .PollUntilCompleted(defaultPoll);
 
-            if (response.IsFaulted)
-            {
-                throw response.Exception;
+                retries--;
+
+                // Workaround until WF-1646 is fixed.
+                progress?.Report("Sleeping to let Spatial start up...");
+                await Task.Delay(TimeSpan.FromSeconds(1), cancellation);
             }
 
             // Apply desired starting worker flags.

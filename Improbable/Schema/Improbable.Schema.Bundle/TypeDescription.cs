@@ -28,9 +28,17 @@ namespace Improbable.Schema.Bundle
 
         public readonly uint? ComponentId;
 
+        /// <summary>
+        /// If true, this is a restricted Improbable component, which workers can never gain authority over.
+        /// Code generators can use this to avoid generating code that may be nonsensical or confusing.
+        /// </summary>
+        public readonly bool IsRestricted;
+
         public TypeDescription(string qualifiedName, Bundle bundle)
         {
             QualifiedName = qualifiedName;
+
+            IsRestricted = qualifiedName.StartsWith("improbable.restricted");
 
             NestedEnums = bundle.Enums.Where(e => e.Value.OuterType == qualifiedName).Select(type => bundle.Enums[type.Key]).ToList();
 

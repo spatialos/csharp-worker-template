@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using Newtonsoft.Json;
 
-namespace Improbable.Stdlib.Platform
+namespace Improbable.Stdlib.Project
 {
     public readonly struct DeploymentWorkerFlags
     {

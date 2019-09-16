@@ -35,7 +35,12 @@ namespace Improbable.WorkerSdkInterop.CSharpCodeGen
             {
                 content.AppendLine(GenerateFromUpdate(type, type.ComponentId.Value, bundle).TrimEnd());
                 content.AppendLine(GenerateCreateGetEvents(type.Events).TrimEnd());
-                content.AppendLine(GenerateUpdateStruct(type, type.Fields));
+
+                if (!type.IsRestricted)
+                {
+                    // Workers can't construct or send updates for restricted components.
+                    content.AppendLine(GenerateUpdateStruct(type, type.Fields));
+                }
             }
 
             if (commandTypes.Contains(type.QualifiedName))
@@ -944,11 +949,19 @@ public static bool TryGetEvents({SchemaComponentUpdate} update{parameters})
             var initializers = new StringBuilder();
             var text = new StringBuilder();
 
-            // If all types are options, default all values to null to allow for easy "one-of" initialization.
-            var nullDefault = fields.All(f => f.TypeSelector == FieldType.Option) ? " = null" : string.Empty;
+            parameters.Append(string.Join(", ", fields.Select(f => $"{GetParameterTypeAsCsharp(f)} {FieldNameToSafeName(SnakeCaseToCamelCase(f.Name))} = default")));
+            initializers.AppendLine(string.Join(Environment.NewLine, fields.Select(f =>
+            {
+                var name = SnakeCaseToPascalCase(f.Name);
 
-            parameters.Append(string.Join(", ", fields.Select(f => $"{GetParameterTypeAsCsharp(f)} {FieldNameToSafeName(SnakeCaseToCamelCase(f.Name))}{nullDefault}")));
-            initializers.AppendLine(string.Join(Environment.NewLine, fields.Select(f => $"{SnakeCaseToPascalCase(f.Name)} = {ParameterConversion(type, f)};")));
+                // Allow `null` to represent an empty collection.
+                if (f.TypeSelector == FieldType.List || f.TypeSelector == FieldType.Map)
+                {
+                    return $"{name} = {FieldNameToSafeName(SnakeCaseToCamelCase(f.Name))} == null ? {EmptyCollection(type, f)} : {ParameterConversion(type, f)};";
+                }
+
+                return $"{name} = {ParameterConversion(type, f)};";
+            })));
 
             if (fields.Count > 0)
             {

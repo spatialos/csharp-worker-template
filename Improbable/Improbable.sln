@@ -51,7 +51,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "WorkerSdkInterop", "WorkerS
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Improbable.WorkerSdkInterop.CSharpCodeGen", "WorkerSdkInterop\Improbable.WorkerSdkInterop.CSharpCodegen\Improbable.WorkerSdkInterop.CSharpCodeGen.csproj", "{BE41E27A-B0B2-4FE7-A38C-9E706EB4F78F}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Improbable.Test", "Test\Improbable.Test\Improbable.Test.csproj", "{6FF85682-1D01-49FA-A504-2CD4BF304E1E}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Improbable.Stdlib.Project", "Stdlib\Improbable.Stdlib.Project\Improbable.Stdlib.Project.csproj", "{B392D0CE-DF4A-472A-966B-989C29950709}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Improbable.Stdlib.Test", "Improbable.Stdlib.Test\Improbable.Stdlib.Test.csproj", "{25D89DC8-6388-468C-9E1C-89EBC2896783}"
 EndProject
