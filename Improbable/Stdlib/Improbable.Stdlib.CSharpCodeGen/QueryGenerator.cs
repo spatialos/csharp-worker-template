@@ -16,6 +16,7 @@ namespace Improbable.Stdlib.CSharpCodeGen
         private readonly StringBuilder constraint = new StringBuilder();
         private readonly StringBuilder fullText = new StringBuilder();
         private readonly Stack<Scope> scopes = new Stack<Scope>();
+        private List<string> parameters = new List<string>();
         private string resultType;
 
         public QueryGenerator(string query, string funcName)
@@ -27,7 +28,7 @@ namespace Improbable.Stdlib.CSharpCodeGen
 
             PopConstraint();
 
-            fullText.Append($@"public static global::Improbable.ComponentInterest.Query {funcName}()
+            fullText.Append($@"public static global::Improbable.ComponentInterest.Query {funcName}({string.Join(", ", parameters)})
 {{
     return new global::Improbable.ComponentInterest.Query(constraint:
 {Indent(2, constraint.ToString().Trim())},
@@ -46,10 +47,21 @@ namespace Improbable.Stdlib.CSharpCodeGen
             return this;
         }
 
-        public Stdlib.QueryGenerator.IQueryReceiver OnComponentsResults(IEnumerable<string> componentNames)
+        public Stdlib.QueryGenerator.IQueryReceiver OnComponentsResults(string[] componentNames)
         {
-            resultType = $"resultComponentId: new [] {{{string.Join(",", componentNames)}}}";
+            resultType = $"resultComponentId: new [] {{{string.Join(", ", componentNames.Select(ToComponentId))}}}";
+            parameters.AddRange(componentNames.Where(c => c.StartsWith("$")).Select(c => $"uint {SnakeCaseToCamelCase(c.Trim('$'))}"));
             return this;
+        }
+
+        private string ToComponentId(string arg)
+        {
+            if (arg.StartsWith("$"))
+            {
+                return SnakeCaseToCamelCase(arg.Trim('$'));
+            }
+
+            return $"global::{CapitalizeNamespace(arg)}.ComponentId";
         }
 
         public Stdlib.QueryGenerator.IQueryReceiver OnAndConstraint()
@@ -112,9 +124,12 @@ namespace Improbable.Stdlib.CSharpCodeGen
             return $"new global::Improbable.ComponentInterest.QueryConstraint({i})";
         }
 
-        public Stdlib.QueryGenerator.IQueryReceiver OnSphere(IEnumerable<int> param)
+        public Stdlib.QueryGenerator.IQueryReceiver OnSphere(string[] args)
         {
-            var args = param.ToArray();
+            var param = args.Where(a => a.StartsWith("$"));
+            parameters.AddRange(param.Select(p => $"double {p.Trim('$')}"));
+            args = args.Select(a => a.Trim('$')).ToArray();
+
             if (args.Length == 1)
             {
                 scopes.Peek().Items.Add($"relativeSphereConstraint: new global::Improbable.ComponentInterest.RelativeSphereConstraint({args[0]})");
@@ -127,9 +142,12 @@ namespace Improbable.Stdlib.CSharpCodeGen
             return this;
         }
 
-        public Stdlib.QueryGenerator.IQueryReceiver OnCylinder(IEnumerable<int> param)
+        public Stdlib.QueryGenerator.IQueryReceiver OnCylinder(string[] args)
         {
-            var args = param.ToArray();
+            var param = args.Where(a => a.StartsWith("$"));
+            parameters.AddRange(param.Select(p => $"double {p.Trim('$')}"));
+            args = args.Select(a => a.Trim('$')).ToArray();
+
             if (args.Length == 1)
             {
                 scopes.Peek().Items.Add($"relativeCylinderConstraint: new global::Improbable.ComponentInterest.RelativeCylinderConstraint({args[0]})");
@@ -142,23 +160,44 @@ namespace Improbable.Stdlib.CSharpCodeGen
             return this;
         }
 
-        public Stdlib.QueryGenerator.IQueryReceiver OnBox(IEnumerable<int> param)
+        public Stdlib.QueryGenerator.IQueryReceiver OnBox(string[] args)
         {
-            var args = param.ToArray();
+            var param = args.Where(a => a.StartsWith("$"));
+            parameters.AddRange(param.Select(p => $"double {p.Trim('$')}"));
+            args = args.Select(a => a.Trim('$')).ToArray();
+
             scopes.Peek().Items.Add($"boxConstraints: new global::Improbable.ComponentInterest.BoxConstraint(new global::Improbable.Coordinates({string.Join(", ", args.Take(3))}), new global::Improbable.EdgeLength({string.Join(", ", args.Skip(3))}))");
 
             return this;
         }
 
-        public Stdlib.QueryGenerator.IQueryReceiver OnEntityId(long param)
+        public Stdlib.QueryGenerator.IQueryReceiver OnEntityId(string param)
         {
-            scopes.Peek().Items.Add($"entityIdConstraint: {param}");
+            if (param.StartsWith("$"))
+            {
+                parameters.Add($"global::Improbable.Stdlib.EntityId {param.TrimStart('$')}");
+                scopes.Peek().Items.Add($"entityIdConstraint: {param.TrimStart('$')}.Value");
+            }
+            else
+            {
+                scopes.Peek().Items.Add($"entityIdConstraint: {param}");
+            }
+
             return this;
         }
 
         public Stdlib.QueryGenerator.IQueryReceiver OnComponentConstraint(string componentName)
         {
-            scopes.Peek().Items.Add($"componentConstraint: \"{componentName}\"");
+            if (componentName.StartsWith("$"))
+            {
+                parameters.Add($"uint {SnakeCaseToCamelCase(componentName.TrimStart('$'))}");
+                scopes.Peek().Items.Add($"componentConstraint: {SnakeCaseToCamelCase(componentName.TrimStart('$'))}");
+            }
+            else
+            {
+                scopes.Peek().Items.Add($"componentConstraint: {ToComponentId(componentName)}");
+            }
+
             return this;
         }
     }

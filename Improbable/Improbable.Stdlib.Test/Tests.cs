@@ -42,9 +42,10 @@ namespace Improbable.Stdlib.Test
         }
 
         [Test]
-        [TestCase("entityid=999", 999)]
-        [TestCase("entityid = 999", 999)]
-        public void Test_EntityIdConstraint(string testCase, long entityId)
+        [TestCase("entityid=999", "999")]
+        [TestCase("entityid = 999", "999")]
+        [TestCase("entityid = $arg", "$arg")]
+        public void Test_EntityIdConstraint(string testCase, string entityId)
         {
             Assert.That(QueryGenerator.EntityIdConstraint.ParseOrThrow(testCase), Is.EqualTo(entityId));
 
@@ -84,35 +85,40 @@ namespace Improbable.Stdlib.Test
         }
 
         [Test]
-        [TestCase("sphere(x=10,y=20,z=30,radius=40)", new[] { 10, 20, 30, 40 })]
-        [TestCase("sphere(radius=40)", new[] { 40 })]
-        [TestCase("sphere ( x = 10 , y = 20 , z = 30 , radius = 40 )", new[] { 10, 20, 30, 40 })]
-        public void Test_CanParseSphereConstraints(string query, IEnumerable<int> resultTokens)
+        [TestCase("sphere(x=10,y=20,z=30,radius=40)", new[] { "10", "20", "30", "40" })]
+        [TestCase("sphere(radius=40)", new[] { "40" })]
+        [TestCase("sphere(radius=$radius)", new[] { "$radius" })]
+        [TestCase("sphere ( x = 10 , y = 20 , z = 30 , radius = 40 )", new[] { "10", "20", "30", "40" })]
+        public void Test_CanParseSphereConstraints(string query, IEnumerable<string> resultTokens)
         {
-            Assert.That(QueryGenerator.SphereParser.ParseOrThrow(query), Is.EqualTo(resultTokens));
+            Assert.That(QueryGenerator.Sphere.ParseOrThrow(query), Is.EqualTo(resultTokens));
         }
 
         [Test]
-        [TestCase("cylinder(radius=40)", new[] { 40 })]
-        [TestCase("cylinder(x=10,y=20,z=30,radius=40)", new[] { 10, 20, 30, 40 })]
-        [TestCase("cylinder ( x = 10 , y = 20, z = 30 , radius = 40 )", new[] { 10, 20, 30, 40 })]
-        public void Test_CanParseCylinderConstraints(string query, IEnumerable<int> resultTokens)
+        [TestCase("cylinder(radius=40)", new[] { "40" })]
+        [TestCase("cylinder(radius=$radius)", new[] { "$radius" })]
+        [TestCase("cylinder(x=10,y=20,z=30,radius=40)", new[] { "10", "20", "30", "40" })]
+        [TestCase("cylinder ( x = 10 , y = 20, z = 30 , radius = 40 )", new[] { "10", "20", "30", "40" })]
+        public void Test_CanParseCylinderConstraints(string query, IEnumerable<string> resultTokens)
         {
-            Assert.That(QueryGenerator.CylinderParser.ParseOrThrow(query), Is.EqualTo(resultTokens));
+            Assert.That(QueryGenerator.Cylinder.ParseOrThrow(query), Is.EqualTo(resultTokens));
         }
 
         [Test]
-        [TestCase("box(center=(1,2,3),size=(4,5,6))", new[] { 1,2,3,4,5,6})]
-        [TestCase("box(center=(x=1,y=2,z=3),size=(x=4,y=5,z=6))", new[] { 1,2,3,4,5,6})]
-        [TestCase("box ( center = ( x = 1 , y = 2 , z = 3 ) , size = ( x = 4 , y = 5 , z = 6 ) )", new[] { 1, 2, 3, 4, 5, 6 })]
-        public void Test_CanParseBoxConstraints(string query, IEnumerable<int> resultTokens)
+        [TestCase("box(center=(1,2,3),size=(4,5,6))", new[] { "1", "2", "3", "4", "5", "6"})]
+        [TestCase("box(center=(x=1,y=2,z=3),size=(x=4,y=5,z=6))", new[] { "1", "2", "3", "4", "5", "6" })]
+        [TestCase("box ( center = ( x = 1 , y = 2 , z = 3 ) , size = ( x = 4 , y = 5 , z = 6 ) )", new[] { "1", "2", "3", "4", "5", "6" })]
+        public void Test_CanParseBoxConstraints(string query, IEnumerable<string> resultTokens)
         {
-            Assert.That(QueryGenerator.BoxParser.ParseOrThrow(query), Is.EqualTo(resultTokens));
+            Assert.That(QueryGenerator.Box.ParseOrThrow(query), Is.EqualTo(resultTokens));
         }
 
         [Test]
         [TestCase("select * where in sphere(x=0,y=0,z=0,radius=100)",
             new [] {"$all", "$sphere(0,0,0,100)"})]
+
+        [TestCase("select (improbable.Position,$args) where in sphere(x=$x,y=0,z=$z,radius=100) and has_component improbable.EntityAcl and has_component $component",
+            new[] { "improbable.Position", "$args", "$sphere($x,0,$z,100)", "$and", "$has_component(improbable.EntityAcl)", "$and", "$has_component($component)" })]
 
         [TestCase("select (improbable.Position,improbable.Metadata) where in sphere(x=0,y=0,z=0,radius=100)",
             new[] { "improbable.Position", "improbable.Metadata", "$sphere(0,0,0,100)" })]
@@ -123,8 +129,8 @@ namespace Improbable.Stdlib.Test
         [TestCase("select * where in box(center=(0,0,0),size=(1,1,1))",
             new[] { "$all", "$box(0,0,0,1,1,1)" })]
 
-        [TestCase("select * where entityid=999 and entityid=88",
-            new[] { "$all", "$entityid(999)", "$and", "$entityid(88)" })]
+        [TestCase("select * where entityid=999 and has_component improbable.EntityAcl",
+            new[] { "$all", "$entityid(999)", "$and", "$has_component(improbable.EntityAcl)" })]
 
         [TestCase("select * where has_component improbable.EntityAcl and entityid=999",
             new[] { "$all", "$has_component(improbable.EntityAcl)", "$and", "$entityid(999)" })]
@@ -177,13 +183,7 @@ namespace Improbable.Stdlib.Test
                 return this;
             }
 
-            public QueryGenerator.IQueryReceiver OnCountResult()
-            {
-                Ops.Add("$count");
-                return this;
-            }
-
-            public QueryGenerator.IQueryReceiver OnComponentsResults(IEnumerable<string> componentNames)
+            public QueryGenerator.IQueryReceiver OnComponentsResults(string[] componentNames)
             {
                 Ops.AddRange(componentNames);
                 return this;
@@ -219,25 +219,25 @@ namespace Improbable.Stdlib.Test
                 return this;
             }
 
-            public QueryGenerator.IQueryReceiver OnSphere(IEnumerable<int> param)
+            public QueryGenerator.IQueryReceiver OnSphere(string[] args)
             {
-                Ops.Add($"$sphere({string.Join(",", param)})");
+                Ops.Add($"$sphere({string.Join(",", args)})");
                 return this;
             }
 
-            public QueryGenerator.IQueryReceiver OnCylinder(IEnumerable<int> param)
+            public QueryGenerator.IQueryReceiver OnCylinder(string[] param)
             {
                 Ops.Add($"$cylinder({string.Join(",", param)})");
                 return this;
             }
 
-            public QueryGenerator.IQueryReceiver OnBox(IEnumerable<int> param)
+            public QueryGenerator.IQueryReceiver OnBox(string[] param)
             {
                 Ops.Add($"$box({string.Join(",", param)})");
                 return this;
             }
 
-            public QueryGenerator.IQueryReceiver OnEntityId(long param)
+            public QueryGenerator.IQueryReceiver OnEntityId(string param)
             {
                 Ops.Add($"$entityid({param})");
                 return this;

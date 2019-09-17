@@ -15,6 +15,7 @@ namespace Improbable.Stdlib
         private static readonly Parser<char, char> UnderScore = Char('_');
         private static readonly Parser<char, char> Dot = Char('.');
         private static readonly Parser<char, char> Slash = Char('/');
+        private static readonly Parser<char, char> Dollar = Char('$');
 
         public static readonly Parser<char, string> ComponentName = Tok(Letter.Or(UnderScore))
             .Then(OneOf(LetterOrDigit, UnderScore, Dot).Many(), CharToIdentifier);
@@ -24,12 +25,19 @@ namespace Improbable.Stdlib
 
         public static readonly Parser<char, string> FullyQualifiedFieldName = ComponentName.Then(Slash, StringPlusChars).Then(FieldName, (s, s1) => s + s1);
 
+        public static readonly Parser<char, string> NumericParameter = OneOf(
+            Try(Tok(Dollar.Then(FieldName, (c, s) => string.Concat(c) + s))),
+                Try(DecimalNum).Select(num => num.ToString()));
+
+        public static readonly Parser<char, string> StringParameter = OneOf(
+            Try(Dollar.Then(FieldName, (c, s) => string.Concat(c) + s)));
+
         private static readonly Parser<char, string> ResultAll = Star.Labelled("<select all>");
         private static readonly Parser<char, IEnumerable<string>> ResultComponentList =
-            Parenthesized(ComponentName.Separated(Comma))
+            Parenthesized((OneOf(Try(StringParameter), ComponentName).Separated(Comma)))
                 .Labelled("<select component list>");
 
-        public static readonly Parser<char, int[]> VectorParser = Parenthesized(
+        public static readonly Parser<char, string[]> Vector = Parenthesized(
                 Map((x, c1, y, c3, z) => new[] {x, y, z},
                     OptionalValueEquals("x"),
                     Comma,
@@ -38,7 +46,7 @@ namespace Improbable.Stdlib
                     OptionalValueEquals("z")))
             .Labelled("<vector3>");
 
-        public static readonly Parser<char, int[]> SphereParser = Tok("sphere").Then(Parenthesized(
+        public static readonly Parser<char, string[]> Sphere = Tok("sphere").Then(Parenthesized(
                 ValueEquals("radius").Select(i => new[] {i})
                     .Or(Map((x, c1, y, c2, z, c3, r) => new[] {x, y, z, r},
                         ValueEquals("x"),
@@ -50,7 +58,7 @@ namespace Improbable.Stdlib
                         ValueEquals("radius")))))
             .Labelled("<sphere>");
 
-        public static readonly Parser<char, int[]> CylinderParser = Tok("cylinder").Then(Parenthesized(
+        public static readonly Parser<char, string[]> Cylinder = Tok("cylinder").Then(Parenthesized(
                 ValueEquals("radius").Select(i => new[] {i})
                     .Or(Map((x, c1, y, c2, z, c3, r) => new[] {x, y, z, r},
                         ValueEquals("x"),
@@ -62,7 +70,7 @@ namespace Improbable.Stdlib
                         ValueEquals("radius")))))
             .Labelled("<cylinder>");
 
-        public static readonly Parser<char, int[]> BoxParser = Tok("box").Then(Parenthesized(
+        public static readonly Parser<char, string[]> Box = Tok("box").Then(Parenthesized(
                 Vector3Equals("center")
                     .Then(Comma, PassThrough)
                     .Then(Vector3Equals("size"), CombineArrays)))
@@ -91,26 +99,26 @@ namespace Improbable.Stdlib
                 .Labelled("<scope>");
         }
 
-        private static Parser<char, int> OptionalValueEquals(string valueName)
+        private static Parser<char, string> OptionalValueEquals(string valueName)
         {
-            return Tok(valueName).Then(Tok(EqualsToken)).Optional().Then(DecimalNum.Before(SkipWhitespaces)).Labelled($"({valueName}=)");
+            return Tok(valueName).Then(Tok(EqualsToken)).Optional().Then(NumericParameter).Labelled($"({valueName}=)");
         }
 
-        private static Parser<char, int> ValueEquals(string valueName)
+        private static Parser<char, string> ValueEquals(string valueName)
         {
-            return Tok(valueName).Then(Tok(EqualsToken)).Optional().Then(DecimalNum.Before(SkipWhitespaces)).Labelled($"{valueName}=");
+            return Tok(valueName).Then(Tok(EqualsToken)).Optional().Then(NumericParameter).Labelled($"{valueName}=");
         }
 
-        private static Parser<char, int[]> Vector3Equals(string valueName)
+        private static Parser<char, string[]> Vector3Equals(string valueName)
         {
-            return Tok(valueName).Labelled($"{valueName}=").Then(EqualsToken).Then(VectorParser);
+            return Tok(valueName).Labelled($"{valueName}=").Then(EqualsToken).Then(Vector);
         }
 
         public static Parser<char, IQueryReceiver> SelectStatement(IQueryReceiver q)
         {
             return Tok("select").Then(OneOf(
                     ResultAll.Select(s => q.OnAllResult()),
-                    ResultComponentList.Select(q.OnComponentsResults)))
+                    ResultComponentList.Select(c => q.OnComponentsResults(c.ToArray()))))
                 .Labelled("<select>");
         }
 
@@ -124,23 +132,18 @@ namespace Improbable.Stdlib
             return Tok("or").Select(s => q.OnOrConstraint()).Then(Rec(() => Constraint(q))).Labelled("<or>");
         }
 
-        public static Parser<char, IQueryReceiver> NotConstraint(IQueryReceiver q)
-        {
-            return Tok("not").Select(s => q.OnNotConstraint()).Then(Rec(() => Constraint(q))).Labelled("<not>");
-        }
-
         public static Parser<char, IQueryReceiver> PositionInConstraint(IQueryReceiver q)
         {
             return Tok("in").Then(
                 OneOf(
-                    SphereParser.Select(q.OnSphere),
-                    CylinderParser.Select(q.OnCylinder),
-                    BoxParser.Select(q.OnBox)))
+                    Sphere.Select(q.OnSphere),
+                    Cylinder.Select(q.OnCylinder),
+                    Box.Select(q.OnBox)))
                 .Labelled("<in>");
         }
 
-        public static readonly Parser<char, long> EntityIdConstraint = Tok("entityid").Then(EqualsToken).Then(LongNum);
-        public static readonly Parser<char, string> ComponentConstraint = Tok("has_component").Then(ComponentName);
+        public static readonly Parser<char, string> EntityIdConstraint = Tok("entityid").Then(EqualsToken).Then(NumericParameter);
+        public static readonly Parser<char, string> ComponentConstraint = Tok("has_component").Then(Try(StringParameter).Or(ComponentName));
 
         public static Parser<char, IQueryReceiver> SpecificConstraints(IQueryReceiver q)
         {
@@ -154,8 +157,8 @@ namespace Improbable.Stdlib
 
         public static Parser<char, IQueryReceiver> CompoundConstraints(IQueryReceiver q)
         {
-            return AndConstraint(q).AtLeastOnce()
-                .Or(OrConstraint(q).AtLeastOnce())
+            return Try(AndConstraint(q)).AtLeastOnce()
+                .Or(Try(OrConstraint(q)).AtLeastOnce())
                 .Optional()
                 .Select(receivers => q)
                 .Labelled("<compound_constraint>");
@@ -186,7 +189,7 @@ namespace Improbable.Stdlib
             return first.Concat(second).ToArray();
         }
 
-        private static int[] PassThrough(int[] values, string s)
+        private static T[] PassThrough<T>(T[] values, string s)
         {
             return values;
         }
@@ -219,16 +222,16 @@ namespace Improbable.Stdlib
         public interface IQueryReceiver
         {
             IQueryReceiver OnAllResult();
-            IQueryReceiver OnComponentsResults(IEnumerable<string> componentNames);
+            IQueryReceiver OnComponentsResults(string[] componentNames);
             IQueryReceiver OnAndConstraint();
             IQueryReceiver OnOrConstraint();
             IQueryReceiver OnNotConstraint();
             IQueryReceiver PushConstraint();
             IQueryReceiver PopConstraint();
-            IQueryReceiver OnSphere(IEnumerable<int> param);
-            IQueryReceiver OnCylinder(IEnumerable<int> param);
-            IQueryReceiver OnBox(IEnumerable<int> param);
-            IQueryReceiver OnEntityId(long param);
+            IQueryReceiver OnSphere(string[] args);
+            IQueryReceiver OnCylinder(string[] strings);
+            IQueryReceiver OnBox(string[] strings);
+            IQueryReceiver OnEntityId(string param);
             IQueryReceiver OnComponentConstraint(string componentName);
 
         }
