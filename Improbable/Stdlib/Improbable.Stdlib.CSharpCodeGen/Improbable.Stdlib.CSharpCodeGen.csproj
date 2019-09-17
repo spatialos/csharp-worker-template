@@ -1,14 +1,15 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
     <LangVersion>latest</LangVersion>
-    <Version>0.0.1-preview</Version>
+    <Version>0.0.2-preview</Version>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\Improbable.CSharpCodeGen\Improbable.CSharpCodeGen.csproj" />
     <ProjectReference Include="..\..\Schema\Improbable.Schema.Bundle\Improbable.Schema.Bundle.csproj" />
+    <ProjectReference Include="..\Improbable.Stdlib.Project\Improbable.Stdlib.Project.csproj" />
     <ProjectReference Include="..\Improbable.Stdlib\Improbable.Stdlib.csproj" />
   </ItemGroup>
 
