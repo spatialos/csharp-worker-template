@@ -35,7 +35,7 @@ namespace Improbable.Stdlib
         bool UseInsecureConnection { get; set; }
 
         [Option("dev-token", HelpText = "Your Development Auth Token. For more information: \n " +
-                                                     "https://docs.improbable.io/reference/13.8/shared/auth/development-authentication#create-a-developmentauthenticationtoken")]
+                                                     "https://docs.improbable.io/reference/14.1/shared/auth/development-authentication#create-a-developmentauthenticationtoken")]
         string DevToken { get; set; }
 
         [Option("display-name")]

@@ -9,14 +9,14 @@ using System.Threading.Tasks;
 using Improbable.Worker.CInterop;
 using Improbable.Worker.CInterop.Alpha;
 using Improbable.Worker.CInterop.Query;
-using Locator = Improbable.Worker.CInterop.Alpha.Locator;
-using LocatorParameters = Improbable.Worker.CInterop.Alpha.LocatorParameters;
+using Locator = Improbable.Worker.CInterop.Locator;
+using LocatorParameters = Improbable.Worker.CInterop.LocatorParameters;
 
 namespace Improbable.Stdlib
 {
     public class WorkerConnection : IDisposable
     {
-        private readonly ConcurrentDictionary<uint, TaskHandler> requestsToComplete = new ConcurrentDictionary<uint, TaskHandler>();
+        private readonly ConcurrentDictionary<long, TaskHandler> requestsToComplete = new ConcurrentDictionary<long, TaskHandler>();
         private Connection connection;
         private Task metricsTask;
         private CancellationTokenSource metricsTcs = new CancellationTokenSource();
@@ -258,14 +258,14 @@ namespace Improbable.Stdlib
             }
         }
 
-        public void Send(EntityId entityId, SchemaCommandRequest request, uint? timeout, CommandParameters? parameters, Action<CommandResponses> complete, Action<StatusCode, string> fail)
+        public void Send(EntityId entityId, uint componentId, uint commandIndex, SchemaCommandRequest request, uint? timeout, CommandParameters? parameters, Action<CommandResponses> complete, Action<StatusCode, string> fail)
         {
-            uint requestId;
+            long requestId;
             lock (connectionLock)
             {
                 ThrowCommandFailedIfNotConnected();
 
-                requestId = connection.SendCommandRequest(entityId.Value, new CommandRequest(request), 1, timeout, parameters);
+                requestId = connection.SendCommandRequest(entityId.Value, new CommandRequest(componentId, commandIndex, request), timeout, parameters);
             }
 
             if (!requestsToComplete.TryAdd(requestId, new TaskHandler { Complete = complete, Fail = fail }))
@@ -327,7 +327,7 @@ namespace Improbable.Stdlib
             }
         }
 
-        private Task<TResultType> RecordTask<TResultType>(uint id, Func<CommandResponses, TResultType> getResult, CancellationToken cancellation, TaskCreationOptions taskOptions)
+        private Task<TResultType> RecordTask<TResultType>(long id, Func<CommandResponses, TResultType> getResult, CancellationToken cancellation, TaskCreationOptions taskOptions)
         {
             var completion = new TaskCompletionSource<TResultType>(taskOptions);
 
@@ -439,17 +439,17 @@ namespace Improbable.Stdlib
             }
         }
 
-        public void SendCommandResponse(uint id, SchemaCommandResponse response)
+        public void SendCommandResponse(long requestId, uint componentId, uint commandIndex, SchemaCommandResponse response)
         {
             lock (connectionLock)
             {
                 ThrowIfNotConnected();
 
-                connection.SendCommandResponse(id, new CommandResponse(response));
+                connection.SendCommandResponse(requestId, new CommandResponse(componentId, commandIndex, response));
             }
         }
 
-        public void SendCommandFailure(uint requestId, string message)
+        public void SendCommandFailure(long requestId, string message)
         {
             lock (connectionLock)
             {
@@ -459,13 +459,13 @@ namespace Improbable.Stdlib
             }
         }
 
-        public void SendComponentUpdate(EntityId entityId, SchemaComponentUpdate update, UpdateParameters? updateParameters = null)
+        public void SendComponentUpdate(EntityId entityId, uint componentId, SchemaComponentUpdate update, UpdateParameters? updateParameters = null)
         {
             lock (connectionLock)
             {
                 ThrowIfNotConnected();
 
-                connection.SendComponentUpdate(entityId.Value, new ComponentUpdate(update), updateParameters);
+                connection.SendComponentUpdate(entityId.Value, new ComponentUpdate(componentId, update), updateParameters);
             }
         }
 

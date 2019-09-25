@@ -35,7 +35,7 @@ namespace Improbable.Stdlib.Platform
 
         private static PlatformCredential GetCredentials()
         {
-            var refreshToken = File.ReadAllText(Path.Combine(ToolbeltConfigDir, "oauth2/oauth2_refresh_token"));
+            var refreshToken = File.ReadAllText(Path.Combine(ToolbeltConfigDir, "oauth2", "oauth2_refresh_token"));
             return new PlatformRefreshTokenCredential(refreshToken);
         }
 

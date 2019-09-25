@@ -77,16 +77,16 @@ namespace Improbable.Stdlib.CSharpCodeGen
 
         private static string GenerateCommands(TypeDescription type, IReadOnlyList<ComponentDefinition.CommandDefinition> commands)
         {
-            var componentName = Case.CapitalizeNamespace(type.QualifiedName);
+            var componentName = CapitalizeNamespace(type.QualifiedName);
             var text = new StringBuilder();
             var bindingMethods = new StringBuilder();
 
             var commandIndices = new StringBuilder();
             foreach (var cmd in commands)
             {
-                var response = Case.CapitalizeNamespace(cmd.ResponseType);
-                var request = Case.CapitalizeNamespace(cmd.RequestType);
-                var cmdName = Case.SnakeCaseToPascalCase(cmd.Name);
+                var response = CapitalizeNamespace(cmd.ResponseType);
+                var request = CapitalizeNamespace(cmd.RequestType);
+                var cmdName = SnakeCaseToPascalCase(cmd.Name);
 
                 commandIndices.AppendLine($"{cmdName} = {cmd.CommandIndex},");
 
@@ -97,7 +97,7 @@ namespace Improbable.Stdlib.CSharpCodeGen
                 {
                     boundResponseSender = $@"public void Send{cmdName}Response(uint id, {response} response)
 {{
-    global::{Case.CapitalizeNamespace(type.QualifiedName)}.Send{cmdName}Response(connection, id, response);
+    global::{CapitalizeNamespace(type.QualifiedName)}.Send{cmdName}Response(connection, id, response);
 }}";
                 }
 
@@ -115,7 +115,7 @@ namespace Improbable.Stdlib.CSharpCodeGen
 /// <returns> A Task containing response payload. </returns>
 public global::System.Threading.Tasks.Task<{response}> Send{cmdName}Async({request} request, {CancellationTokenType} cancellation = default, uint? timeout = null, global::Improbable.Worker.CInterop.CommandParameters? commandParameters = null)
 {{
-    return global::{Case.CapitalizeNamespace(type.QualifiedName)}.Send{cmdName}Async(connection, entityId, request, cancellation, timeout, commandParameters);
+    return global::{CapitalizeNamespace(type.QualifiedName)}.Send{cmdName}Async(connection, entityId, request, cancellation, timeout, commandParameters);
 }}
 {boundResponseSender}");
                 var responseSender = "";
@@ -125,10 +125,10 @@ public global::System.Threading.Tasks.Task<{response}> Send{cmdName}Async({reque
                 {
                     responseSender = $@"public static void Send{cmdName}Response({WorkerConnectionType} connection, uint id, {response} response)
 {{
-    var schemaResponse = new global::Improbable.Worker.CInterop.SchemaCommandResponse({componentName}.ComponentId, {cmd.CommandIndex});
+    var schemaResponse = new global::Improbable.Worker.CInterop.SchemaCommandResponse();
     response.ApplyToSchemaObject(schemaResponse.GetObject());
 
-    connection.SendCommandResponse(id, schemaResponse);
+    connection.SendCommandResponse(id, {componentName}.ComponentId, {cmd.CommandIndex}, schemaResponse);
 }}
 ";
                 }
@@ -156,7 +156,7 @@ public static global::System.Threading.Tasks.Task<{response}> Send{cmdName}Async
                                                                                  global::Improbable.Worker.CInterop.CommandParameters? commandParameters = null,
                                                                                  global::System.Threading.Tasks.TaskCreationOptions taskOptions = global::System.Threading.Tasks.TaskCreationOptions.RunContinuationsAsynchronously)
 {{
-    var schemaRequest = new global::Improbable.Worker.CInterop.SchemaCommandRequest({componentName}.ComponentId, {cmd.CommandIndex});
+    var schemaRequest = new global::Improbable.Worker.CInterop.SchemaCommandRequest();
     request.ApplyToSchemaObject(schemaRequest.GetObject());
 
     var completion = new global::System.Threading.Tasks.TaskCompletionSource<{response}>(taskOptions);
@@ -176,7 +176,7 @@ public static global::System.Threading.Tasks.Task<{response}> Send{cmdName}Async
         completion.TrySetException(new global::Improbable.Stdlib.CommandFailedException(code, message));
     }}
 
-    connection.Send(entityId, schemaRequest, timeout, commandParameters, Complete, Fail);
+    connection.Send(entityId, {componentName}.ComponentId, {cmd.CommandIndex}, schemaRequest, timeout, commandParameters, Complete, Fail);
 
     return completion.Task;
 }}");
@@ -187,22 +187,17 @@ public static global::System.Threading.Tasks.Task<{response}> Send{cmdName}Async
                 text.Append($@"
 public enum Commands
 {{
-{Case.Indent(1, commandIndices.ToString().TrimEnd())}
+{Indent(1, commandIndices.ToString().TrimEnd())}
 }}
 
-public static Commands? GetCommandType(global::Improbable.Worker.CInterop.CommandRequestOp request)
+public static Commands GetCommandType(global::Improbable.Worker.CInterop.CommandRequestOp request)
 {{
     if (request.Request.ComponentId != ComponentId)
     {{
         throw new global::System.InvalidOperationException($""Mismatch of ComponentId (expected {{ComponentId}} but got {{request.Request.ComponentId}}"");
     }}
 
-    if (!request.Request.SchemaData.HasValue)
-    {{
-        return null;
-    }}
-
-    return (Commands)request.Request.SchemaData.Value.GetCommandIndex();
+    return (Commands) request.Request.CommandIndex;
 }}
 
 public readonly struct CommandSenderBinding
@@ -215,7 +210,7 @@ public readonly struct CommandSenderBinding
         this.connection = connection;
         this.entityId = entityId;
     }}
-{Case.Indent(1, bindingMethods.ToString().TrimEnd())}
+{Indent(1, bindingMethods.ToString().TrimEnd())}
 }}
 
 public static CommandSenderBinding Bind({WorkerConnectionType} connection, {Types.EntityIdType} entityId)
@@ -230,14 +225,14 @@ public static CommandSenderBinding Bind({WorkerConnectionType} connection, {Type
 
         public static string GenerateSendUpdate(TypeDescription type)
         {
-            var typeName = Case.GetPascalCaseNameFromTypeName(type.QualifiedName);
-            var typeNamespace = Case.GetPascalCaseNamespaceFromTypeName(type.QualifiedName);
+            var typeName = GetPascalCaseNameFromTypeName(type.QualifiedName);
+            var typeNamespace = GetPascalCaseNamespaceFromTypeName(type.QualifiedName);
 
             var update = $"global::{typeNamespace}.{typeName}.Update";
 
             return $@"public static void SendUpdate({WorkerConnectionType} connection, {Types.EntityIdType} entityId, {update} update, global::Improbable.Worker.CInterop.UpdateParameters? updateParams = null)
 {{
-    connection.SendComponentUpdate(entityId.Value, update.ToSchemaUpdate(), updateParams);
+    connection.SendComponentUpdate(entityId.Value, ComponentId, update.ToSchemaUpdate(), updateParams);
 }}
 ";
         }

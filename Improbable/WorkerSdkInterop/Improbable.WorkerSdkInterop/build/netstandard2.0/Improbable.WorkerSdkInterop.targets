@@ -13,17 +13,17 @@
   </Target>
 
   <ItemGroup>
-    <None Include="$(MSBuildThisFileDirectory)\..\..\runtimes\win-x64\native\CoreSdkDll.dll" Link="CoreSdkDll.dll"
+    <None Include="$(MSBuildThisFileDirectory)\..\..\runtimes\win-x64\native\improbable_worker.dll" Link="improbable_worker.dll"
           Condition="'$(RuntimeIdentifier)'=='win-x64' Or '$([MSBuild]::IsOSPlatform(Windows)' == 'true'">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Include="$(MSBuildThisFileDirectory)\..\..\runtimes\linux-x64\native\libCoreSdkDll.so"
-          Link="libCoreSdkDll.so"
+    <None Include="$(MSBuildThisFileDirectory)\..\..\runtimes\linux-x64\native\improbable_worker.so"
+          Link="improbable_worker.so"
           Condition="'$(RuntimeIdentifier)'=='linux-x64' Or '$([MSBuild]::IsOSPlatform(Linux)' == 'true'">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Include="$(MSBuildThisFileDirectory)\..\..\runtimes\osx-x64\native\libCoreSdkDll.dylib"
-          Link="libCoreSdkDll.dylib"
+    <None Include="$(MSBuildThisFileDirectory)\..\..\runtimes\osx-x64\native\improbable_worker.dylib"
+          Link="improbable_worker.dylib"
           Condition="'$(RuntimeIdentifier)'=='osx-x64' Or '$([MSBuild]::IsOSPlatform(OSX)' == 'true'">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
