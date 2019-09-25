@@ -95,7 +95,7 @@ namespace Improbable.Stdlib.CSharpCodeGen
                 // Don't allow workers to send command responses for system commands.
                 if (!type.IsRestricted)
                 {
-                    boundResponseSender = $@"public void Send{cmdName}Response(uint id, {response} response)
+                    boundResponseSender = $@"public void Send{cmdName}Response(long id, {response} response)
 {{
     global::{CapitalizeNamespace(type.QualifiedName)}.Send{cmdName}Response(connection, id, response);
 }}";
@@ -123,7 +123,7 @@ public global::System.Threading.Tasks.Task<{response}> Send{cmdName}Async({reque
                 // Don't allow workers to send command responses for system commands.
                 if (!type.IsRestricted)
                 {
-                    responseSender = $@"public static void Send{cmdName}Response({WorkerConnectionType} connection, uint id, {response} response)
+                    responseSender = $@"public static void Send{cmdName}Response({WorkerConnectionType} connection, long id, {response} response)
 {{
     var schemaResponse = new global::Improbable.Worker.CInterop.SchemaCommandResponse();
     response.ApplyToSchemaObject(schemaResponse.GetObject());
