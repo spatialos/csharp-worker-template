@@ -17,8 +17,8 @@
           Condition="'$(RuntimeIdentifier)'=='win-x64' Or '$([MSBuild]::IsOSPlatform(Windows)' == 'true'">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Include="$(MSBuildThisFileDirectory)\..\..\runtimes\linux-x64\native\improbable_worker.so"
-          Link="improbable_worker.so"
+    <None Include="$(MSBuildThisFileDirectory)\..\..\runtimes\linux-x64\native\libimprobable_worker.so"
+          Link="libimprobable_worker.so"
           Condition="'$(RuntimeIdentifier)'=='linux-x64' Or '$([MSBuild]::IsOSPlatform(Linux)' == 'true'">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
