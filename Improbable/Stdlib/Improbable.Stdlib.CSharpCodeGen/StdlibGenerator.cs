@@ -125,7 +125,7 @@ public global::System.Threading.Tasks.Task<{response}> Send{cmdName}Async({reque
                 {
                     responseSender = $@"public static void Send{cmdName}Response({WorkerConnectionType} connection, long id, {response} response)
 {{
-    var schemaResponse = new global::Improbable.Worker.CInterop.SchemaCommandResponse();
+    var schemaResponse = global::Improbable.Worker.CInterop.SchemaCommandResponse.Create();
     response.ApplyToSchemaObject(schemaResponse.GetObject());
 
     connection.SendCommandResponse(id, {componentName}.ComponentId, {cmd.CommandIndex}, schemaResponse);
@@ -156,7 +156,7 @@ public static global::System.Threading.Tasks.Task<{response}> Send{cmdName}Async
                                                                                  global::Improbable.Worker.CInterop.CommandParameters? commandParameters = null,
                                                                                  global::System.Threading.Tasks.TaskCreationOptions taskOptions = global::System.Threading.Tasks.TaskCreationOptions.RunContinuationsAsynchronously)
 {{
-    var schemaRequest = new global::Improbable.Worker.CInterop.SchemaCommandRequest();
+    var schemaRequest = global::Improbable.Worker.CInterop.SchemaCommandRequest.Create();
     request.ApplyToSchemaObject(schemaRequest.GetObject());
 
     var completion = new global::System.Threading.Tasks.TaskCompletionSource<{response}>(taskOptions);
