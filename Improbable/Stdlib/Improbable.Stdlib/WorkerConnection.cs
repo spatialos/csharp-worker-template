@@ -102,7 +102,9 @@ namespace Improbable.Stdlib
                 },
                 UseInsecureConnection = options.UseInsecureConnection,
                 Logging = connectionParameters.ProtocolLogging,
-                EnableLogging = connectionParameters.EnableProtocolLoggingAtStartup
+                EnableLogging = connectionParameters.EnableProtocolLoggingAtStartup,
+                CredentialsType = LocatorCredentialsType.PlayerIdentity,
+                ProjectName = options.ProjectName
             };
 
             using (var locator = new Locator(options.SpatialOsHost, options.SpatialOsPort, locatorParameters))
