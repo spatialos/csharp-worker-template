@@ -22,8 +22,8 @@
           Condition="'$(RuntimeIdentifier)'=='linux-x64' Or '$([MSBuild]::IsOSPlatform(Linux)' == 'true'">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Include="$(MSBuildThisFileDirectory)\..\..\runtimes\osx-x64\native\improbable_worker.dylib"
-          Link="improbable_worker.dylib"
+    <None Include="$(MSBuildThisFileDirectory)\..\..\runtimes\osx-x64\native\libimprobable_worker.dylib"
+          Link="libimprobable_worker.dylib"
           Condition="'$(RuntimeIdentifier)'=='osx-x64' Or '$([MSBuild]::IsOSPlatform(OSX)' == 'true'">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
