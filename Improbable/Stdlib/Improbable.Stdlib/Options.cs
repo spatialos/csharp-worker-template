@@ -43,5 +43,8 @@ namespace Improbable.Stdlib
 
         [Option("player-id")]
         string PlayerId { get; set; }
+
+        [Option("project-name")]
+        string ProjectName { get; set; }
     }
 }
