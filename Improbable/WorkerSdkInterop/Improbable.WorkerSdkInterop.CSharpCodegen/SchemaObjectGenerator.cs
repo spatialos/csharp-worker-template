@@ -581,10 +581,10 @@ internal static {typeName} ApplyUpdate({typeName} source, {SchemaComponentUpdate
 
 public global::Improbable.Worker.CInterop.ComponentData ToData()
 {{
-    var schemaData = new global::Improbable.Worker.CInterop.SchemaComponentData({componentId});
+    var schemaData = global::Improbable.Worker.CInterop.SchemaComponentData.Create();
     ApplyToSchemaObject(schemaData.GetFields());
 
-    return new global::Improbable.Worker.CInterop.ComponentData(schemaData);
+    return new global::Improbable.Worker.CInterop.ComponentData({componentId}, schemaData);
 }}");
 
             return text.ToString();
@@ -931,7 +931,7 @@ public static bool TryGetEvents({SchemaComponentUpdate} update{parameters})
 
     public {SchemaComponentUpdate} ToSchemaUpdate()
     {{
-        var update = new {SchemaComponentUpdate}(global::{typeNamespace}.{typeName}.ComponentId);
+        var update = {SchemaComponentUpdate}.Create();
 
 {Indent(2, toUpdateMethodBody.ToString().TrimEnd())}
 

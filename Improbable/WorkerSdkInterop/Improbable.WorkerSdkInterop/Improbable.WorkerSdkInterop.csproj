@@ -3,28 +3,33 @@
     <TargetFramework>netstandard2.0</TargetFramework>
     <Platforms>x64</Platforms>
     <Version>$(SpatialOSSdkVersion)</Version>
+
+    <WindowsWorkerPackage>c-dynamic-x86_64-vc140_mt-win32</WindowsWorkerPackage>
+    <MacOSWorkerPackage>c-dynamic-x86_64-clang-macos</MacOSWorkerPackage>
+    <LinuxWorkerPackage>c-dynamic-x86_64-gcc510-linux</LinuxWorkerPackage>
+    <CInteropPackage>csharp_cinterop</CInteropPackage>
   </PropertyGroup>
 
   <Target Name="PreparePackages" BeforeTargets="Restore;BeforeCompile" Condition="$(DesignTimeBuild) != true" >
     <RemoveDir Directories="lib;runtimes" />
     <MakeDir Directories="$(ZipDir)" />
 
-    <Exec Command="spatial package get worker_sdk csharp-c-interop $(SpatialOSSdkVersion) $(ZipDir)/csharp-c-interop.zip" Condition="!Exists('$(ZipDir)\csharp-c-interop.zip')" />
-    <Unzip DestinationFolder="lib\netstandard2.0" SourceFiles="$(ZipDir)\csharp-c-interop.zip" SkipUnchangedFiles="true" />
+    <Exec Command="spatial package get worker_sdk $(CInteropPackage) $(SpatialOSSdkVersion) $(ZipDir)/$(CInteropPackage).zip" Condition="!Exists('$(ZipDir)\$(CInteropPackage).zip')" />
+    <Unzip DestinationFolder="lib\netstandard2.0" SourceFiles="$(ZipDir)\$(CInteropPackage).zip" SkipUnchangedFiles="true" />
 
     <!--
       Native code that the managed DLL binds to.
       The DestinationFolder attribute's "runtimes/<rid>/native" is important.
       See https://docs.microsoft.com/en-us/dotnet/core/rid-catalog for the Runtime Id catalog.
       -->
-    <Exec Command="spatial package get worker_sdk core-dynamic-x86_64-win32 $(SpatialOSSdkVersion) $(ZipDir)/core-dynamic-x86_64-win32.zip" Condition="!Exists('$(ZipDir)\core-dynamic-x86_64-win32.zip')" />
-    <Unzip DestinationFolder="runtimes\win-x64\native" SourceFiles="$(ZipDir)\core-dynamic-x86_64-win32.zip" SkipUnchangedFiles="true" />
+    <Exec Command="spatial package get worker_sdk $(WindowsWorkerPackage) $(SpatialOSSdkVersion) $(ZipDir)/$(WindowsWorkerPackage).zip" Condition="!Exists('$(ZipDir)\$(WindowsWorkerPackage).zip')" />
+    <Unzip DestinationFolder="runtimes\win-x64\native" SourceFiles="$(ZipDir)\$(WindowsWorkerPackage).zip" SkipUnchangedFiles="true" />
 
-    <Exec Command="spatial package get worker_sdk core-dynamic-x86_64-macos $(SpatialOSSdkVersion) $(ZipDir)/core-dynamic-x86_64-macos.zip" Condition="!Exists('$(ZipDir)\core-dynamic-x86_64-macos.zip')" />
-    <Unzip DestinationFolder="runtimes\osx-x64\native" SourceFiles="$(ZipDir)\core-dynamic-x86_64-macos.zip" SkipUnchangedFiles="true" />
+    <Exec Command="spatial package get worker_sdk $(MacOSWorkerPackage) $(SpatialOSSdkVersion) $(ZipDir)/$(MacOSWorkerPackage).zip" Condition="!Exists('$(ZipDir)\$(MacOSWorkerPackage).zip')" />
+    <Unzip DestinationFolder="runtimes\osx-x64\native" SourceFiles="$(ZipDir)\$(MacOSWorkerPackage).zip" SkipUnchangedFiles="true" />
 
-    <Exec Command="spatial package get worker_sdk core-dynamic-x86_64-linux $(SpatialOSSdkVersion) $(ZipDir)/core-dynamic-x86_64-linux.zip" Condition="!Exists('$(ZipDir)\core-dynamic-x86_64-linux.zip')" />
-    <Unzip DestinationFolder="runtimes\linux-x64\native" SourceFiles="$(ZipDir)\core-dynamic-x86_64-linux.zip" SkipUnchangedFiles="true" />
+    <Exec Command="spatial package get worker_sdk $(LinuxWorkerPackage) $(SpatialOSSdkVersion) $(ZipDir)/$(LinuxWorkerPackage).zip" Condition="!Exists('$(ZipDir)\$(LinuxWorkerPackage).zip')" />
+    <Unzip DestinationFolder="runtimes\linux-x64\native" SourceFiles="$(ZipDir)\$(LinuxWorkerPackage).zip" SkipUnchangedFiles="true" />
   </Target>
 
   <!-- These items need to be in specific folders, rather than nested under the 'content' directory. -->
@@ -32,8 +37,8 @@
     <Content Include="build\netstandard2.0\Improbable.WorkerSdkInterop.targets" PackagePath="%(Identity)" />
     <Content Include="lib\netstandard2.0\Improbable.Worker.CInterop.dll" PackagePath="%(Identity)" />
     <Content Include="lib\netstandard2.0\Improbable.Worker.CInterop.xml" PackagePath="%(Identity)" />
-    <Content Include="runtimes\linux-x64\native\libCoreSdkDll.so" PackagePath="%(Identity)" />
-    <Content Include="runtimes\osx-x64\native\libCoreSdkDll.dylib" PackagePath="%(Identity)" />
-    <Content Include="runtimes\win-x64\native\CoreSdkDll.dll" PackagePath="%(Identity)" />
+    <Content Include="runtimes\linux-x64\native\libimprobable_worker.so" PackagePath="%(Identity)" />
+    <Content Include="runtimes\osx-x64\native\libimprobable_worker.dylib" PackagePath="%(Identity)" />
+    <Content Include="runtimes\win-x64\native\improbable_worker.dll" PackagePath="%(Identity)" />
   </ItemGroup>
 </Project>

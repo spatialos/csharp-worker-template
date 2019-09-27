@@ -20,6 +20,5 @@
     <Content Include="build\netstandard2.0\Improbable.Stdlib.Schema.targets" PackagePath="%(Identity)" />
     <Content Include="schema\improbable\restricted\system_components.schema" />
     <Content Include="schema\improbable\standard_library.schema" />
-    <Content Include="schema\improbable\vector3.schema" />
   </ItemGroup>
 </Project>

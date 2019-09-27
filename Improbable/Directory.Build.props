@@ -3,7 +3,7 @@
   <PropertyGroup>
     <SolutionDir Condition="'$(SolutionDir)'==''">$(MSBuildThisFileDirectory)</SolutionDir>
 
-    <SpatialOSSdkVersion>13.8.2</SpatialOSSdkVersion>
+    <SpatialOSSdkVersion>14.1.0</SpatialOSSdkVersion>
     <ZipDir>$(MSBuildProjectDirectory)\obj\$(SpatialOSSdkVersion)</ZipDir>
 
     <Authors>Improbable Worlds, Ltd</Authors>
