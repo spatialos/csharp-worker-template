@@ -160,7 +160,7 @@ type SetParentResponse {
     string new_path = 1;
 
     // The total number of items affected by the move.
-    int64 item_count = 2;
+    uint64 item_count = 2;
 }
 
 type CreateRequest {
@@ -187,7 +187,7 @@ type DeleteRequest {
 
 type DeleteResponse {
   // The total number of items deleted.
-  int64 item_count = 1;
+  uint64 item_count = 1;
 }
 
 // Only one of these fields can be set per request.
@@ -269,7 +269,7 @@ component DatabaseSyncService {
   command BatchOperationResponse batch (BatchOperationRequest);
 
   // This is a list of worker types that are allowed to execute any commands that require
-  // write authorization.  
+  // write authorization.
   list<string> write_worker_types = 1;
 
   // This event is periodically triggered to notify interested workers of paths that have changed.
