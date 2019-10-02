@@ -1,6 +1,8 @@
-FROM mcr.microsoft.com/dotnet/core/sdk:3.0 as build
+FROM mcr.microsoft.com/dotnet/core/sdk:3.0 AS build
+
 RUN curl -LSs -o /usr/local/bin/gosu -SL "https://github.com/tianon/gosu/releases/download/1.4/gosu-$(dpkg --print-architecture)" \
     && chmod +x /usr/local/bin/gosu
+
 ARG TOOLBELT_VERSION="20190924.093427.d1d4ab159e"
 WORKDIR /build
 
@@ -19,5 +21,4 @@ COPY ./ ./worker/
 
 WORKDIR /build/worker
 
-COPY ci/docker/entrypoint.sh ./entrypoint.sh
-ENTRYPOINT ["./entrypoint.sh"]
+ENTRYPOINT [ "/bin/bash" ]
