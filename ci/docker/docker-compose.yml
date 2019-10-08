@@ -6,6 +6,5 @@ services:
       context: ../../
     volumes:
         - ${SPATIAL_OAUTH_DIR}:/var/spatial_oauth
-        - ${PACKAGES_DIR}:/build/worker/nupkgs
     environment:
         - IMPROBABLE_CONFIG_DIR=/var/spatial_oauth/
