@@ -1,13 +1,14 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>netcoreapp2.2</TargetFramework>
+    <TargetFramework>netcoreapp3.0</TargetFramework>
     <Platforms>x64</Platforms>
-    <LangVersion>7.2</LangVersion>
+    <Platform Condition="'$(Platform)' == ''">x64</Platform>
+    <LangVersion>8.0</LangVersion>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Improbable.Stdlib" Version="0.0.3-preview" />
-    <PackageReference Include="Improbable.WorkerSdkInterop" Version="13.8.2" />
+    <PackageReference Include="Improbable.WorkerSdkInterop" Version="14.1.0" />
     <PackageReference Include="Serilog" Version="2.8.0" />
     <PackageReference Include="Serilog.Sinks.Console" Version="3.1.1" />
     <PackageReference Include="Serilog.Sinks.File" Version="4.0.0" />

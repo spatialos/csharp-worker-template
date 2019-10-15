@@ -35,7 +35,7 @@ namespace Improbable.Stdlib.Platform
 
         private static PlatformCredential GetCredentials()
         {
-            var refreshToken = File.ReadAllText(Path.Combine(ToolbeltConfigDir, "oauth2/oauth2_refresh_token"));
+            var refreshToken = File.ReadAllText(Path.Combine(ToolbeltConfigDir, "oauth2", "oauth2_refresh_token"));
             return new PlatformRefreshTokenCredential(refreshToken);
         }
 
@@ -72,8 +72,11 @@ namespace Improbable.Stdlib.Platform
             {
                 try
                 {
-                    Process.GetProcessById(pid);
-                    needsStart = false;
+                    var process = Process.GetProcessById(pid);
+                    if (process.MainModule != null && process.MainModule.FileName.Contains("spatiald"))
+                    {
+                        needsStart = false;
+                    }
                 }
                 catch
                 {
@@ -101,51 +104,22 @@ namespace Improbable.Stdlib.Platform
                 throw new FileNotFoundException(snapshotFile);
             }
 
-            var retries = 10;
-
-            Operation<Deployment, CreateDeploymentMetadata> response;
-
-            while (true)
-            {
-                progress?.Report($"Starting local deployment for '{project.ProjectName}' with snapshot '{startDeployment.SnapshotId}'...");
-
-                try
+            progress?.Report($"Starting local deployment for '{project.ProjectName}' with snapshot '{startDeployment.SnapshotId}'...");
+            var response = client.CreateDeployment(new CreateDeploymentRequest
                 {
-                    response = client.CreateDeployment(new CreateDeploymentRequest
-                        {
-                            Deployment = new Deployment
-                            {
-                                Tag = { startDeployment.Tags },
-                                Name = "local",
-                                StartingSnapshotId = startDeployment.SnapshotId,
-                                ProjectName = project.ProjectName,
-                                LaunchConfig = new SpatialOS.Deployment.V1Alpha1.LaunchConfig
-                                {
-                                    ConfigJson = File.ReadAllText(splConfigPath)
-                                }
-                            }
-                        }, CallSettings.FromCancellationToken(cancellation))
-                        .PollUntilCompleted(defaultPoll);
-
-                    break;
-                }
-                catch (RpcException e)
-                {
-                    // The create command currently returns before the system is completely setup.
-                    // If that's the case, the error will be something like "Grpc.Core.RpcException : Status(StatusCode=Unavailable, Detail="snapshot of id test is not valid; all SubConns are in TransientFailure")"
-                    // Retry in this case.
-                    if (e.Status.StatusCode != StatusCode.Unavailable || retries <= 0)
+                    Deployment = new Deployment
                     {
-                        throw;
+                        Tag = { startDeployment.Tags },
+                        Name = "local",
+                        StartingSnapshotId = startDeployment.SnapshotId,
+                        ProjectName = project.ProjectName,
+                        LaunchConfig = new SpatialOS.Deployment.V1Alpha1.LaunchConfig
+                        {
+                            ConfigJson = File.ReadAllText(splConfigPath)
+                        }
                     }
-                }
-
-                retries--;
-
-                // Workaround until WF-1646 is fixed.
-                progress?.Report("Sleeping to let Spatial start up...");
-                await Task.Delay(TimeSpan.FromSeconds(1), cancellation);
-            }
+                }, CallSettings.FromCancellationToken(cancellation))
+                .PollUntilCompleted(defaultPoll);
 
             // Apply desired starting worker flags.
             if (startDeployment.WorkerFlags.Any())

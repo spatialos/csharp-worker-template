@@ -18,5 +18,6 @@ namespace GameLogic
         public string Token { get; set; }
         public string DisplayName { get; set; }
         public string PlayerId { get; set; }
+        public string ProjectName { get; set; }
     }
 }

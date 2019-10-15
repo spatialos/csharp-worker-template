@@ -48,9 +48,6 @@ namespace Improbable.Stdlib
                     case OpType.RemoveEntity:
                         Ops.Add(new Op { OpType = OpType.RemoveEntity, RemoveEntityOp = rawOps.GetRemoveEntityOp(i) });
                         break;
-                    case OpType.ReserveEntityIdResponse:
-                        // Deprecated - should we even bother?
-                        break;
                     case OpType.ReserveEntityIdsResponse:
                         Ops.Add(new Op { OpType = OpType.ReserveEntityIdsResponse, ReserveEntityIdsResponseOp = rawOps.GetReserveEntityIdsResponseOp(i) });
                         break;

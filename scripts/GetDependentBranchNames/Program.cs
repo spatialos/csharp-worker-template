@@ -48,13 +48,18 @@ namespace BuildNugetPackages
 
                     var remoteBranch = lines.Any() && lines.First().Contains(currentBranch) ? currentBranch : "master";
 
-                    Console.Out.WriteLine($@"steps:
+                    var pipeline = $@"steps:
   - label: ""{dep.Label}""
     trigger: {dep.Trigger}
     build:
       branch: {remoteBranch}
       env:
-        CSHARP_TEMPLATE_BRANCH: ""{currentBranch}""");
+        CSHARP_TEMPLATE_BRANCH: ""{currentBranch}""";
+
+                    Console.Out.WriteLine(pipeline);
+
+                    // Output to stderr to aid in debugging.
+                    Console.Error.WriteLine(pipeline);
                 }
             }
 

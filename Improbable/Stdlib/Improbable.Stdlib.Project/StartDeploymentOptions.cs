@@ -42,8 +42,8 @@ namespace Improbable.Stdlib.Project
                 WorkerFlags = WorkerFlags.AddRange(workerFlags);
             }
 
-            ProjectConfig = JsonConvert.DeserializeObject<ProjectConfig>(File.ReadAllText(projectConfigPath, Encoding.UTF8));
-            LaunchConfig = JsonConvert.DeserializeObject<LaunchConfig>(File.ReadAllText(launchConfigPath, Encoding.UTF8));
+            LaunchConfig = JsonConvert.DeserializeObject<LaunchConfig>(File.ReadAllText(LaunchConfigPath, Encoding.UTF8));
+            ProjectConfig = JsonConvert.DeserializeObject<ProjectConfig>(File.ReadAllText(ProjectConfigPath, Encoding.UTF8));
         }
     }
 }
