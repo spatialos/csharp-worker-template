@@ -55,21 +55,9 @@ namespace Improbable.Stdlib
 
         }
 
-        public static Task<WorkerConnection> ConnectAsync(IWorkerOptions workerOptions, ConnectionParameters connectionParameters, CancellationToken cancellation = default)
+        public static Task<WorkerConnection> ConnectAsync(IReceptionistOptions workerOptions, ConnectionParameters connectionParameters, CancellationToken cancellation = default)
         {
-            switch (workerOptions)
-            {
-                case IReceptionistOptions receptionistOptions:
-                    var workerName = workerOptions.WorkerName ?? $"{connectionParameters.WorkerType}-{Guid.NewGuid().ToString()}";
-                    return ConnectAsync(receptionistOptions.SpatialOsHost, receptionistOptions.SpatialOsPort, workerName, connectionParameters, cancellation);
-
-                case ILocatorOptions locatorOptions:
-                    connectionParameters.Network.UseExternalIp = true;
-                    return ConnectAsync(locatorOptions, connectionParameters, cancellation);
-
-                default:
-                    throw new NotImplementedException("Unrecognized option type: " + workerOptions.GetType());
-            }
+            return ConnectAsync(workerOptions.SpatialOsHost, workerOptions.SpatialOsPort, workerOptions.WorkerName, connectionParameters, cancellation);
         }
 
         public static async Task<WorkerConnection> ConnectAsync(string host, ushort port, string workerName, ConnectionParameters connectionParameters, CancellationToken cancellation = default)

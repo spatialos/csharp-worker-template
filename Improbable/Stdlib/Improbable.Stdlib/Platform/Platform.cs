@@ -3,15 +3,14 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Google.Api.Gax;
 using Google.Api.Gax.Grpc;
-using Google.LongRunning;
 using Google.Protobuf.WellKnownTypes;
-using Grpc.Core;
 using Improbable.SpatialOS.Deployment.V1Alpha1;
 using Improbable.SpatialOS.Platform.Common;
 using Improbable.SpatialOS.PlayerAuth.V2Alpha1;
@@ -26,27 +25,27 @@ namespace Improbable.Stdlib.Platform
     /// </summary>
     public static class Platform
     {
-        private static string ToolbeltConfigDir =>
+        private static string ImprobableConfigDir =>
             Environment.GetEnvironmentVariable("IMPROBABLE_CONFIG_DIR") ?? (RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
                 ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), ".improbable")
                 : Path.Combine(Environment.GetEnvironmentVariable("HOME"), ".improbable"));
 
-        private static readonly PollSettings defaultPoll = new PollSettings(Expiration.FromTimeout(TimeSpan.FromMinutes(2)), TimeSpan.FromMilliseconds(100));
+        private static readonly PollSettings DefaultPolling = new PollSettings(Expiration.FromTimeout(TimeSpan.FromMinutes(2)), TimeSpan.FromMilliseconds(100));
 
         private static PlatformCredential GetCredentials()
         {
-            var refreshToken = File.ReadAllText(Path.Combine(ToolbeltConfigDir, "oauth2", "oauth2_refresh_token"));
+            var refreshToken = File.ReadAllText(Path.Combine(ImprobableConfigDir, "oauth2", "oauth2_refresh_token"));
             return new PlatformRefreshTokenCredential(refreshToken);
         }
 
-        private static PlatformApiChannel GetLocalApiChannel()
+        private static PlatformApiChannel GetApiChannel(in NetworkEnvironment env)
         {
-            return new PlatformApiChannel(GetCredentials(), new PlatformApiEndpoint("localhost", 9876, true));
+            return new PlatformApiChannel(GetCredentials(), new PlatformApiEndpoint(env.ServiceIp, env.ServicePort, env.Secure == false));
         }
 
-        public static async Task<Deployment> StartLocalAsync(StartDeploymentOptions startDeployment, CancellationToken cancellation = default, IProgress<string> progress = null)
+        public static async Task<Deployment> StartLocalAsync(StartDeploymentOptions startDeployment, NetworkEnvironment env, CancellationToken cancellation = default, IProgress<string> progress = null)
         {
-            var client = DeploymentServiceClient.Create(GetLocalApiChannel());
+            var client = DeploymentServiceClient.Create(GetApiChannel(env));
 
             progress?.Report("Logging in...");
             Shell.Run("spatial", progress, "auth", "login", "--json_output");
@@ -66,8 +65,8 @@ namespace Improbable.Stdlib.Platform
             var project = JsonConvert.DeserializeObject<ProjectConfig>(File.ReadAllText(startDeployment.ProjectConfigPath, Encoding.UTF8));
 
             var needsStart = true;
-            var pidFile = Path.Combine(ToolbeltConfigDir, "spatiald.pid");
-            var lockFile = Path.Combine(ToolbeltConfigDir, "spatiald.lock");
+            var pidFile = Path.Combine(ImprobableConfigDir, "spatiald.pid");
+            var lockFile = Path.Combine(ImprobableConfigDir, "spatiald.lock");
             if (File.Exists(pidFile) && int.TryParse(File.ReadAllText(pidFile).Trim(), out var pid))
             {
                 try
@@ -92,11 +91,11 @@ namespace Improbable.Stdlib.Platform
             if (needsStart)
             {
                 progress?.Report("Starting Spatial service...");
-                Shell.Run("spatial", progress, "service", "start", "--json_output", "--main_config", Shell.Escape(startDeployment.ProjectConfigPath));
+                Shell.Run("spatial", progress, "service", "start", "--json_output", "--main_config", Shell.Escape(startDeployment.ProjectConfigPath), "--runtime_ip", env.RuntimeIp);
             }
 
             // Shut down any currently-running local deployments...
-            await StopLocalAsync(startDeployment.ProjectConfig, cancellation, progress);
+            await StopLocalAsync(startDeployment.ProjectConfig, env, cancellation, progress);
 
             var snapshotFile = Path.Combine(Path.GetDirectoryName(startDeployment.ProjectConfigPath) ?? "", "snapshots", $"{startDeployment.SnapshotId}.snapshot");
             if (!File.Exists(snapshotFile))
@@ -104,7 +103,7 @@ namespace Improbable.Stdlib.Platform
                 throw new FileNotFoundException(snapshotFile);
             }
 
-            progress?.Report($"Starting local deployment for '{project.ProjectName}' with snapshot '{startDeployment.SnapshotId}'...");
+            progress?.Report($"Starting local deployment for '{project.ProjectName}' with snapshot '{startDeployment.SnapshotId}', runtimeIP: {env.RuntimeIp}, serviceIP: {env.ServiceIp}...");
             var response = client.CreateDeployment(new CreateDeploymentRequest
                 {
                     Deployment = new Deployment
@@ -119,9 +118,10 @@ namespace Improbable.Stdlib.Platform
                         }
                     }
                 }, CallSettings.FromCancellationToken(cancellation))
-                .PollUntilCompleted(defaultPoll);
+                .PollUntilCompleted(DefaultPolling);
 
             // Apply desired starting worker flags.
+            // This is applied separately to ensure that the static, config-based worker flags aren't removed.
             if (startDeployment.WorkerFlags.Any())
             {
                 var updatedFields = new Deployment
@@ -143,9 +143,9 @@ namespace Improbable.Stdlib.Platform
             return response.Result;
         }
 
-        public static async Task StopLocalAsync(ProjectConfig config, CancellationToken cancellation = default, IProgress<string> progress = null)
+        public static async Task StopLocalAsync(ProjectConfig config, NetworkEnvironment env,  CancellationToken cancellation = default, IProgress<string> progress = null)
         {
-            var client = DeploymentServiceClient.Create(GetLocalApiChannel());
+            var client = DeploymentServiceClient.Create(GetApiChannel(env));
 
             var deployments = await client.ListDeploymentsAsync(new ListDeploymentsRequest
             {

@@ -16,7 +16,7 @@ namespace Improbable.Stdlib
 
     public interface IReceptionistOptions : IWorkerOptions
     {
-        [Option("spatialos-host", Default = "localhost", HelpText = "The host to use to connect to SpatialOS.")]
+        [Option("spatialos-host", Default = "127.0.0.1", HelpText = "The host to use to connect to SpatialOS.")]
         string SpatialOsHost { get; set; }
 
         [Option("spatialos-port", Default = (ushort) 7777, HelpText = "The port to use to connect to SpatialOS.")]
