@@ -27,7 +27,7 @@ There are also a few helpers available:
 
 ## Machine setup
 
-1. Install .NET Core v2.2.6 (SDK and Runtime) [from the download archive](https://dotnet.microsoft.com/download/dotnet-core/2.2) for your system.
+1. Install .NET Core v3.0 (SDK and Runtime) [from the download archive](https://dotnet.microsoft.com/download/dotnet-core) for your system.
 
 ## Project layout
 
