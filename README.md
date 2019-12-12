@@ -84,7 +84,7 @@ Once you've done this, you can delete the placeholder `schema` directory.
 
 If you want to explore the available command line options, you can run the worker:
 
-`dotnet run -p Workers/GameLogic -- help`
+`dotnet run -p Workers/GameLogic --help`
 
 ## Building for the cloud
 
