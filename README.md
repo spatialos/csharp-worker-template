@@ -93,13 +93,13 @@ Build your managed workers for the cloud by running:
 **Windows**
 
 ```powershell
-`scripts/publish-linux-workers.ps1`
+scripts/publish-linux-workers.ps1
 ```
 
 **macOS/Linux**
 
 ```bash
-`scripts/publish-linux-workers.sh`
+scripts/publish-linux-workers.sh
 ```
 
 ## How do I...
