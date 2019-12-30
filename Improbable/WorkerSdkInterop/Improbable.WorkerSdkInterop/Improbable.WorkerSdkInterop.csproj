@@ -1,6 +1,5 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>netstandard2.0</TargetFramework>
     <Platforms>x64</Platforms>
     <Version>$(SpatialOSSdkVersion)</Version>
 
@@ -15,7 +14,7 @@
     <MakeDir Directories="$(ZipDir)" />
 
     <Exec Command="spatial package get worker_sdk $(CInteropPackage) $(SpatialOSSdkVersion) $(ZipDir)/$(CInteropPackage).zip" Condition="!Exists('$(ZipDir)\$(CInteropPackage).zip')" />
-    <Unzip DestinationFolder="lib\netstandard2.0" SourceFiles="$(ZipDir)\$(CInteropPackage).zip" SkipUnchangedFiles="true" />
+    <Unzip DestinationFolder="lib\netstandard2.1" SourceFiles="$(ZipDir)\$(CInteropPackage).zip" SkipUnchangedFiles="true" />
 
     <!--
       Native code that the managed DLL binds to.
@@ -34,9 +33,9 @@
 
   <!-- These items need to be in specific folders, rather than nested under the 'content' directory. -->
   <ItemGroup>
-    <Content Include="build\netstandard2.0\Improbable.WorkerSdkInterop.targets" PackagePath="%(Identity)" />
-    <Content Include="lib\netstandard2.0\Improbable.Worker.CInterop.dll" PackagePath="%(Identity)" />
-    <Content Include="lib\netstandard2.0\Improbable.Worker.CInterop.xml" PackagePath="%(Identity)" />
+    <Content Include="build\netstandard2.1\Improbable.WorkerSdkInterop.targets" PackagePath="%(Identity)" />
+    <Content Include="lib\netstandard2.1\Improbable.Worker.CInterop.dll" PackagePath="%(Identity)" />
+    <Content Include="lib\netstandard2.1\Improbable.Worker.CInterop.xml" PackagePath="%(Identity)" />
     <Content Include="runtimes\linux-x64\native\libimprobable_worker.so" PackagePath="%(Identity)" />
     <Content Include="runtimes\osx-x64\native\libimprobable_worker.dylib" PackagePath="%(Identity)" />
     <Content Include="runtimes\win-x64\native\improbable_worker.dll" PackagePath="%(Identity)" />

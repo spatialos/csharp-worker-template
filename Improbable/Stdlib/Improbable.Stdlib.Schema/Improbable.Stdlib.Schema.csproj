@@ -1,7 +1,5 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>netstandard2.0</TargetFramework>
-
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <Version>$(SpatialOSSdkVersion)</Version>
     <Description>SpatialOS Standard Library Schema</Description>
@@ -17,7 +15,7 @@
 
   <ItemGroup>
     <!-- This item needs to be in specific folders, rather than nested under the 'content' directory. -->
-    <Content Include="build\netstandard2.0\Improbable.Stdlib.Schema.targets" PackagePath="%(Identity)" />
+    <Content Include="build\netstandard2.1\Improbable.Stdlib.Schema.targets" PackagePath="%(Identity)" />
     <Content Include="schema\improbable\restricted\system_components.schema" />
     <Content Include="schema\improbable\standard_library.schema" />
   </ItemGroup>
