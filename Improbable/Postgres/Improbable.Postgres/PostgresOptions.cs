@@ -33,13 +33,13 @@ namespace Improbable.Postgres
         {
             keys = flagValues.Keys.ToList();
 
-            foreach (var kv in flagValues.ToList())
+            foreach (var (key, currentValue) in flagValues.ToList())
             {
-                var value = getter(kv.Key, kv.Value);
+                var value = getter(key, currentValue);
 
                 if (!string.IsNullOrEmpty(value))
                 {
-                    flagValues[kv.Key] = value;
+                    flagValues[key] = value;
                 }
             }
         }
@@ -51,34 +51,17 @@ namespace Improbable.Postgres
 
         public static string GetFromIOptions(IPostgresOptions options, string key, string value)
         {
-            string optionValue;
-            switch (key)
+            var optionValue = key switch
             {
-                case HostFlagName:
-                    optionValue = options.PostgresHost;
-                    break;
-                case UserNameFlagName:
-                    optionValue = options.PostgresUserName;
-                    break;
-                case PasswordFlagName:
-                    optionValue = options.PostgresPassword;
-                    break;
-                case DatabaseFlagName:
-                    optionValue = options.PostgresDatabase;
-                    break;
-                case AdditionalFlagName:
-                    optionValue = options.PostgresAdditionalOptions;
-                    break;
-                default:
-                    throw new InvalidOperationException($"Unknown Postgres flag {key}");
-            }
+                HostFlagName => options.PostgresHost,
+                UserNameFlagName => options.PostgresUserName,
+                PasswordFlagName => options.PostgresPassword,
+                DatabaseFlagName => options.PostgresDatabase,
+                AdditionalFlagName => options.PostgresAdditionalOptions,
+                _ => throw new ArgumentException($"Unknown Postgres flag {key}")
+            };
 
-            if (string.IsNullOrEmpty(optionValue))
-            {
-                return value;
-            }
-
-            return optionValue;
+            return string.IsNullOrEmpty(optionValue) ? value : optionValue;
         }
 
         public string PostgresHost
@@ -197,7 +180,7 @@ namespace Improbable.Postgres
             {
                 lock (rootLock)
                 {
-                    return cachedConnectionString ?? (cachedConnectionString = AsPostgresConnectionString());
+                    return cachedConnectionString ??= AsPostgresConnectionString();
                 }
             }
         }
@@ -207,31 +190,33 @@ namespace Improbable.Postgres
             foreach (var key in keys)
             {
                 string value = null;
-                if (opList.TryGetWorkerFlagChange(key, ref value))
+                if (!opList.TryGetWorkerFlagChange(key, ref value))
                 {
-                    lock (rootLock)
+                    continue;
+                }
+
+                lock (rootLock)
+                {
+                    if (string.IsNullOrEmpty(value) && !IsEmptyStringAllowed(key))
                     {
-                        if (!string.IsNullOrEmpty(value) || IsEmptyStringAllowed(key))
-                        {
-                            flagValues[key] = value;
-                            cachedConnectionString = null;
-                        }
+                        continue;
                     }
+
+                    flagValues[key] = value;
+                    cachedConnectionString = null;
                 }
             }
         }
 
         private static bool IsEmptyStringAllowed(string key)
         {
-            switch (key)
+            return key switch
             {
-                case HostFlagName:
-                case UserNameFlagName:
-                case PasswordFlagName:
-                    return false;
-                default:
-                    return true;
-            }
+                HostFlagName => false,
+                UserNameFlagName => false,
+                PasswordFlagName => false,
+                _ => true
+            };
         }
 
         private string AsPostgresConnectionString()

@@ -15,12 +15,7 @@ namespace Improbable.Stdlib
 
         public override string ToString()
         {
-            if (string.IsNullOrEmpty(Message))
-            {
-                return $"{Code}";
-            }
-
-            return $"{Code}: {Message}";
+            return string.IsNullOrEmpty(Message) ? $"{Code}" : $"{Code}: {Message}";
         }
     }
 }

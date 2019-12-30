@@ -29,22 +29,15 @@ namespace Improbable.CSharpCodeGen
                 sb.AppendLine($"public const uint ComponentId = {type.ComponentId.Value};");
             }
 
-            foreach (var field in type.Fields.Where(f => IsFieldTypeRecursive(bundle, type.QualifiedName, f)))
-            {
-                sb.AppendLine($"// Recursive field {SnakeCaseToPascalCase(field.Name)} omitted.");
-                sb.AppendLine($"// public readonly {GetFieldTypeAsCsharp(type, field)} {SnakeCaseToPascalCase(field.Name)};");
-            }
-
-            var filteredFields = type.Fields.Where(f => !IsFieldTypeRecursive(bundle, type.QualifiedName, f)).ToList();
-            sb.AppendLine(GenerateFields(type, filteredFields));
+            sb.AppendLine(GenerateFields(type, type.Fields));
 
             // For types with a single field of map or list type, provide a params-style constructor for nicer ergonomics.
-            if (filteredFields.Count == 1 && (filteredFields[0].TypeSelector == FieldType.List || filteredFields[0].TypeSelector == FieldType.Map))
+            if (type.Fields.Count == 1 && (type.Fields[0].IsList() || type.Fields[0].IsMap()))
             {
-                sb.AppendLine(GenerateParamsConstructor(type, filteredFields));
+                sb.AppendLine(GenerateParamsConstructor(type, type.Fields));
             }
 
-            sb.AppendLine(GenerateEquatable(type, filteredFields));
+            sb.AppendLine(GenerateEquatable(type, type.Fields));
 
             return sb.ToString();
         }
@@ -54,25 +47,12 @@ namespace Improbable.CSharpCodeGen
             var text = new StringBuilder();
             var typeName = GetPascalCaseNameFromTypeName(type.QualifiedName);
 
-            string innerType;
             var field = fields[0];
 
-            switch (field.TypeSelector)
-            {
-                case FieldType.List:
-                    innerType = GetTypeAsCsharp(field.ListType.InnerType);
-                    break;
-                case FieldType.Map:
-                    innerType = $"global::System.Collections.Generic.KeyValuePair<{GetTypeAsCsharp(field.MapType.KeyType)}, {GetTypeAsCsharp(field.MapType.ValueType)}>";
-                    break;
-                default:
-                    throw new ArgumentOutOfRangeException();
-            }
-
             text.Append($@"
-public {typeName}(params {innerType}[] {FieldNameToSafeName(SnakeCaseToCamelCase(field.Name))})
+public {typeName}(params {GetInnerTypeAsCsharp(field)}[] {FieldNameToSafeName(SnakeCaseToCamelCase(field.Name))})
 {{
-    {SnakeCaseToPascalCase(field.Name)} = {ParameterConversion(type, field)};
+    {SnakeCaseToPascalCase(field.Name)} = {InitializeFromParameter(type, field)};
 }}");
 
             return text.ToString();
@@ -146,7 +126,7 @@ public static bool operator !=({typeName} a, {typeName} b)
 ";
         }
 
-        private string GenerateFields(TypeDescription type, IReadOnlyList<FieldDefinition> fields)
+        private string GenerateFields(TypeDescription type, IEnumerable<FieldDefinition> fields)
         {
             var fieldText = new StringBuilder();
             foreach (var field in fields)

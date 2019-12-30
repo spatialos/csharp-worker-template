@@ -75,7 +75,7 @@ namespace Improbable.Stdlib.CSharpCodeGen
             return sb.ToString();
         }
 
-        private static string GenerateCommands(TypeDescription type, IReadOnlyList<ComponentDefinition.CommandDefinition> commands)
+        private static string GenerateCommands(TypeDescription type, IEnumerable<ComponentDefinition.CommandDefinition> commands)
         {
             var componentName = CapitalizeNamespace(type.QualifiedName);
             var text = new StringBuilder();
