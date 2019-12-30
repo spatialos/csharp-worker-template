@@ -9,6 +9,8 @@ using Improbable.CSharpCodeGen;
 using Improbable.Schema.Bundle;
 using Improbable.Stdlib.CSharpCodeGen;
 using Improbable.WorkerSdkInterop.CSharpCodeGen;
+using Serilog;
+using Serilog.Core;
 using static Improbable.CSharpCodeGen.Case;
 using Types = Improbable.CSharpCodeGen.Types;
 
@@ -33,13 +35,17 @@ namespace CodeGenerator
     {
         private static void Main(string[] args)
         {
+            Log.Logger = new LoggerConfiguration()
+                .WriteTo.Console().
+                CreateLogger();
+
             Parser.Default.ParseArguments<Options>(args)
                 .WithParsed(Run)
                 .WithNotParsed(errors =>
                 {
                     foreach (var error in errors)
                     {
-                        Console.Error.WriteLine(error);
+                        Log.Error(error.ToString());
                     }
 
                     Environment.ExitCode = 1;
@@ -48,7 +54,8 @@ namespace CodeGenerator
 
         private static void Run(Options options)
         {
-            Console.WriteLine(Parser.Default.FormatCommandLine(options));
+            
+            Log.Information(Parser.Default.FormatCommandLine(options));
 
             var timer = new Stopwatch();
             timer.Start();
@@ -74,7 +81,7 @@ namespace CodeGenerator
 
                 foreach (var w in types.SelectMany(t => t.Warnings))
                 {
-                    Console.WriteLine(w);
+                    Log.Warning(w);
                 }
 
                 var baseGenerator = new Generator(bundle);
@@ -151,14 +158,14 @@ namespace {GetPascalCaseNamespaceFromTypeName(key)}
             }
             catch (Exception exception)
             {
-                Console.Error.WriteLine(exception);
+                Log.Error(exception, "While running");
                 Environment.ExitCode = 1;
             }
             finally
             {
                 timer.Stop();
 
-                Console.WriteLine($"Processed schema bundle in {timer.Elapsed}.");
+                Log.Information($"Processed schema bundle in {timer.Elapsed}.");
             }
         }
 
