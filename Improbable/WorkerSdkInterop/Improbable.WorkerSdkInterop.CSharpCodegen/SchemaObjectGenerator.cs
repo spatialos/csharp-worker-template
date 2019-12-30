@@ -26,7 +26,7 @@ namespace Improbable.WorkerSdkInterop.CSharpCodeGen
             var content = new StringBuilder();
             var commandTypes = bundle.CommandTypes;
 
-            var filteredFields = type.Fields.Where(f => !FieldTypeIsRecursive(bundle, type.QualifiedName, f)).ToList();
+            var filteredFields = type.Fields.Where(f => !IsFieldTypeRecursive(bundle, type.QualifiedName, f)).ToList();
 
             content.AppendLine(GenerateSchemaConstructor(type, filteredFields, bundle).TrimEnd());
             content.AppendLine(GenerateApplyToSchemaObject(filteredFields).TrimEnd());

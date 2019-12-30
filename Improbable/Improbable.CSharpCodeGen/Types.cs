@@ -626,12 +626,12 @@ namespace Improbable.CSharpCodeGen
             }
         }
 
-        public static bool FieldTypeIsRecursive(Bundle bundle, string typeQualifiedName, FieldDefinition fieldDefinition)
+        public static bool IsFieldTypeRecursive(Bundle bundle, string typeQualifiedName, FieldDefinition fieldDefinition)
         {
             return fieldDefinition.TypeSelector == FieldType.Option &&
                    fieldDefinition.OptionType.InnerType.ValueTypeSelector == ValueType.Type &&
                    (fieldDefinition.OptionType.InnerType.Type == typeQualifiedName ||
-                    bundle.Types[fieldDefinition.OptionType.InnerType.Type].Fields.Any(f => FieldTypeIsRecursive(bundle, typeQualifiedName, f)));
+                    bundle.Types[fieldDefinition.OptionType.InnerType.Type].Fields.Any(f => IsFieldTypeRecursive(bundle, typeQualifiedName, f)));
         }
     }
 }

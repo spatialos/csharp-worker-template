@@ -29,13 +29,13 @@ namespace Improbable.CSharpCodeGen
                 sb.AppendLine($"public const uint ComponentId = {type.ComponentId.Value};");
             }
 
-            foreach (var field in type.Fields.Where(f => FieldTypeIsRecursive(bundle, type.QualifiedName, f)))
+            foreach (var field in type.Fields.Where(f => IsFieldTypeRecursive(bundle, type.QualifiedName, f)))
             {
                 sb.AppendLine($"// Recursive field {SnakeCaseToPascalCase(field.Name)} omitted.");
                 sb.AppendLine($"// public readonly {GetFieldTypeAsCsharp(type, field)} {SnakeCaseToPascalCase(field.Name)};");
             }
 
-            var filteredFields = type.Fields.Where(f => !FieldTypeIsRecursive(bundle, type.QualifiedName, f)).ToList();
+            var filteredFields = type.Fields.Where(f => !IsFieldTypeRecursive(bundle, type.QualifiedName, f)).ToList();
             sb.AppendLine(GenerateFields(type, filteredFields));
 
             // For types with a single field of map or list type, provide a params-style constructor for nicer ergonomics.
