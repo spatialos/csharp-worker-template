@@ -72,6 +72,11 @@ namespace CodeGenerator
                     .OrderByDescending(t => t.QualifiedName.Count(c => c == '.'))
                     .ToList();
 
+                foreach (var w in types.SelectMany(t => t.Warnings))
+                {
+                    Console.WriteLine(w);
+                }
+
                 var baseGenerator = new Generator(bundle);
                 var generators = new List<ICodeGenerator>
                 {

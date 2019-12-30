@@ -26,10 +26,12 @@ namespace Improbable.WorkerSdkInterop.CSharpCodeGen
             var content = new StringBuilder();
             var commandTypes = bundle.CommandTypes;
 
-            content.AppendLine(GenerateSchemaConstructor(type, type.Fields, bundle).TrimEnd());
-            content.AppendLine(GenerateApplyToSchemaObject(type.Fields).TrimEnd());
-            content.AppendLine(GenerateUpdaters(type.Fields).TrimEnd());
-            content.AppendLine(GenerateSchemaConstructor(type, type.Fields));
+            var filteredFields = type.Fields.Where(f => !FieldTypeIsRecursive(bundle, type.QualifiedName, f)).ToList();
+
+            content.AppendLine(GenerateSchemaConstructor(type, filteredFields, bundle).TrimEnd());
+            content.AppendLine(GenerateApplyToSchemaObject(filteredFields).TrimEnd());
+            content.AppendLine(GenerateUpdaters(filteredFields).TrimEnd());
+            content.AppendLine(GenerateSchemaConstructor(type, filteredFields));
 
             if (type.ComponentId.HasValue)
             {
@@ -39,7 +41,7 @@ namespace Improbable.WorkerSdkInterop.CSharpCodeGen
                 if (!type.IsRestricted)
                 {
                     // Workers can't construct or send updates for restricted components.
-                    content.AppendLine(GenerateUpdateStruct(type, type.Fields));
+                    content.AppendLine(GenerateUpdateStruct(type, filteredFields));
                 }
             }
 

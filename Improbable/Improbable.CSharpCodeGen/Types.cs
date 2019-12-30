@@ -625,5 +625,13 @@ namespace Improbable.CSharpCodeGen
                     throw new ArgumentOutOfRangeException();
             }
         }
+
+        public static bool FieldTypeIsRecursive(Bundle bundle, string typeQualifiedName, FieldDefinition fieldDefinition)
+        {
+            return fieldDefinition.TypeSelector == FieldType.Option &&
+                   fieldDefinition.OptionType.InnerType.ValueTypeSelector == ValueType.Type &&
+                   (fieldDefinition.OptionType.InnerType.Type == typeQualifiedName ||
+                    bundle.Types[fieldDefinition.OptionType.InnerType.Type].Fields.Any(f => FieldTypeIsRecursive(bundle, typeQualifiedName, f)));
+        }
     }
 }
