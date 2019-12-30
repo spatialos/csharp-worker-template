@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <IncludeBuildOutput>false</IncludeBuildOutput>
-    <Version>0.0.1-preview</Version>
+    <Version>0.0.2-preview</Version>
     <Description>SpatialOS Postgres Schema</Description>
   </PropertyGroup>
 

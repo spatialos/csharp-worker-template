@@ -6,7 +6,7 @@
     <Platform Condition="'$(Platform)' == ''">x64</Platform>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Improbable.Stdlib" Version="0.0.3-preview" />
+    <PackageReference Include="Improbable.Stdlib" Version="0.0.4-preview" />
     <PackageReference Include="Improbable.WorkerSdkInterop" Version="14.1.0" />
     <PackageReference Include="Serilog" Version="2.8.0" />
     <PackageReference Include="Serilog.Sinks.Console" Version="3.1.1" />

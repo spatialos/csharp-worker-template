@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <IncludeBuildOutput>false</IncludeBuildOutput>
-    <Version>0.0.2-preview</Version>
+    <Version>0.0.3-preview</Version>
     <Description>SpatialOS DatabaseSync Schema</Description>
   </PropertyGroup>
 

@@ -3,7 +3,7 @@
   <PropertyGroup>
     <Platforms>x64</Platforms>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <Version>0.0.3-preview</Version>
+    <Version>0.0.4-preview</Version>
   </PropertyGroup>
 
   <ItemGroup>

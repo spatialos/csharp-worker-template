@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <IncludeBuildOutput>true</IncludeBuildOutput>
-    <Version>0.0.1-preview</Version>
+    <Version>0.0.2-preview</Version>
     <Description>SpatialOS DatabaseSync Persistence Generator</Description>
   </PropertyGroup>
 

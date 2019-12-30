@@ -3,7 +3,7 @@
   <PropertyGroup>
     <Platforms>AnyCPU</Platforms>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <Version>0.0.1-preview</Version>
+    <Version>0.0.2-preview</Version>
   </PropertyGroup>
 
   <ItemGroup>

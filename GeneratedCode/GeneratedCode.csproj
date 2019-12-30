@@ -10,7 +10,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Improbable.Stdlib" Version="0.0.3-preview" />
+    <PackageReference Include="Improbable.Stdlib" Version="0.0.4-preview" />
     <PackageReference Include="Improbable.WorkerSdkInterop" Version="14.1.0" />
     <PackageReference Include="Improbable.Schema.Compiler" Version="14.1.0" />
     <PackageReference Include="Newtonsoft.Json" Version="12.0.2" />
