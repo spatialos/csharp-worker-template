@@ -124,8 +124,12 @@ namespace Improbable.Stdlib
                     throw new Exception($"{connection.GetConnectionStatusCode()}: {connection.GetConnectionStatusCodeDetailString()}");
                 }
 
-                return new WorkerConnection(connection);
+            if (connection.GetConnectionStatusCode() != ConnectionStatusCode.Success)
+            {
+                throw new Exception($"{connection.GetConnectionStatusCode()}: {connection.GetConnectionStatusCodeDetailString()}");
             }
+
+            return new WorkerConnection(connection);
         }
 
         public static async Task<WorkerConnection> ConnectAsync(ILocatorOptions options, ConnectionParameters connectionParameters, CancellationToken cancellation = default)
@@ -158,8 +162,12 @@ namespace Improbable.Stdlib
                     throw new Exception($"{connection.GetConnectionStatusCode()}: {connection.GetConnectionStatusCodeDetailString()}");
                 }
 
-                return new WorkerConnection(connection);
+            if (connection != null && connection.GetConnectionStatusCode() != ConnectionStatusCode.Success)
+            {
+                throw new Exception($"{connection.GetConnectionStatusCode()}: {connection.GetConnectionStatusCodeDetailString()}");
             }
+
+            return new WorkerConnection(connection);
         }
 
         public void StartSendingMetrics(params Action<Metrics>[] updaterList)
@@ -208,7 +216,7 @@ namespace Improbable.Stdlib
 
         private static string GetDevelopmentPlayerIdentityToken(string host, ushort port, bool useInsecureConnection, string authToken, string playerId, string displayName)
         {
-            using (var pit = DevelopmentAuthentication.CreateDevelopmentPlayerIdentityTokenAsync(
+            using var pit = DevelopmentAuthentication.CreateDevelopmentPlayerIdentityTokenAsync(
                 host, port,
                 new PlayerIdentityTokenRequest
                 {
@@ -216,53 +224,45 @@ namespace Improbable.Stdlib
                     PlayerId = playerId,
                     DisplayName = displayName,
                     UseInsecureConnection = useInsecureConnection
-                }))
+                });
+            var value = pit.Get();
+
+            if (!value.HasValue)
             {
-                var value = pit.Get();
-
-                if (!value.HasValue)
-                {
-                    throw new AuthenticationException("Error received while retrieving a Player Identity Token: null result");
-                }
-
-                if (value.Value.Status.Code != ConnectionStatusCode.Success)
-                {
-                    throw new AuthenticationException($"Error received while retrieving a Player Identity Token: {value.Value.Status.Detail}");
-                }
-
-                return value.Value.PlayerIdentityToken;
+                throw new AuthenticationException("Error received while retrieving a Player Identity Token: null result");
             }
+
+            if (value.Value.Status.Code != ConnectionStatusCode.Success)
+            {
+                throw new AuthenticationException($"Error received while retrieving a Player Identity Token: {value.Value.Status.Detail}");
+            }
+
+            return value.Value.PlayerIdentityToken;
         }
 
-        private static List<LoginTokenDetails> GetDevelopmentLoginTokens(string host, ushort port, bool useInsecureConnection, string workerType, string pit)
+        private static IEnumerable<LoginTokenDetails> GetDevelopmentLoginTokens(string host, ushort port, bool useInsecureConnection, string workerType, string pit)
         {
-            using (var tokens = DevelopmentAuthentication.CreateDevelopmentLoginTokensAsync(host, port,
+            using var tokens = DevelopmentAuthentication.CreateDevelopmentLoginTokensAsync(host, port,
                 new LoginTokensRequest
                 {
                     PlayerIdentityToken = pit,
                     WorkerType = workerType,
-                    UseInsecureConnection = useInsecureConnection,
-                }))
+                    UseInsecureConnection = useInsecureConnection
+                });
+
+            var value = tokens.Get();
+
+            if (!value.HasValue)
             {
-                var value = tokens.Get();
-
-                if (!value.HasValue)
-                {
-                    throw new AuthenticationException("Error received while retrieving Login Tokens: null result");
-                }
-
-                if (value.Value.Status.Code != ConnectionStatusCode.Success)
-                {
-                    throw new AuthenticationException($"Error received while retrieving Login Tokens: {value.Value.Status.Detail}");
-                }
-
-                if (value.Value.LoginTokens.Count == 0)
-                {
-                    throw new Exception("No deployment returned for this project.");
-                }
-
-                return value.Value.LoginTokens;
+                throw new AuthenticationException("Error received while retrieving Login Tokens: null result");
             }
+
+            if (value.Value.Status.Code != ConnectionStatusCode.Success)
+            {
+                throw new AuthenticationException($"Error received while retrieving Login Tokens: {value.Value.Status.Detail}");
+            }
+
+            return value.Value.LoginTokens;
         }
 
         private void CompleteCommands(OpList opList)
@@ -395,86 +395,91 @@ namespace Improbable.Stdlib
 
         private void CompleteCommand(ReserveEntityIdsResponseOp r)
         {
-            if (requestsToComplete.TryRemove(r.RequestId, out var completer))
+            if (!requestsToComplete.TryRemove(r.RequestId, out var completer))
             {
-                switch (r.StatusCode)
-                {
-                    case StatusCode.Success:
-                        completer.Complete(new CommandResponses { ReserveEntityIds = r });
-                        break;
-                    default:
-                        completer.Fail(r.StatusCode, r.Message);
-                        break;
-                }
+                return;
+            }
+
+            if (r.StatusCode == StatusCode.Success)
+            {
+                completer.Complete(new CommandResponses {ReserveEntityIds = r});
+            }
+            else
+            {
+                completer.Fail(r.StatusCode, r.Message);
             }
         }
 
         private void CompleteCommand(EntityQueryResponseOp r)
         {
-            if (requestsToComplete.TryRemove(r.RequestId, out var completer))
+            if (!requestsToComplete.TryRemove(r.RequestId, out var completer))
             {
-                switch (r.StatusCode)
-                {
-                    case StatusCode.Success:
-                        completer.Complete(new CommandResponses { EntityQuery = r });
-                        break;
-                    default:
-                        completer.Fail(r.StatusCode, r.Message);
-                        break;
-                }
+                return;
+            }
+
+            if (r.StatusCode == StatusCode.Success)
+            {
+                completer.Complete(new CommandResponses {EntityQuery = r});
+            }
+            else
+            {
+                completer.Fail(r.StatusCode, r.Message);
             }
         }
 
         private void CompleteCommand(CommandResponseOp r)
         {
-            if (requestsToComplete.TryRemove(r.RequestId, out var completer))
+            if (!requestsToComplete.TryRemove(r.RequestId, out var completer))
             {
-                switch (r.StatusCode)
-                {
-                    case StatusCode.Success:
-                        if (!r.Response.SchemaData.HasValue)
-                        {
-                            throw new ArgumentNullException(nameof(r.Response.SchemaData));
-                        }
+                return;
+            }
 
-                        completer.Complete(new CommandResponses { UserCommand = r });
-                        break;
-                    default:
-                        completer.Fail(r.StatusCode, r.Message);
-                        break;
+            if (r.StatusCode == StatusCode.Success)
+            {
+                if (!r.Response.SchemaData.HasValue)
+                {
+                    throw new ArgumentNullException(nameof(r.Response.SchemaData));
                 }
+
+                completer.Complete(new CommandResponses {UserCommand = r});
+            }
+            else
+            {
+                completer.Fail(r.StatusCode, r.Message);
             }
         }
 
         private void CompleteCommand(CreateEntityResponseOp r)
         {
-            if (requestsToComplete.TryRemove(r.RequestId, out var completer))
+            if (!requestsToComplete.TryRemove(r.RequestId, out var completer))
             {
-                switch (r.StatusCode)
-                {
-                    case StatusCode.Success:
-                        completer.Complete(new CommandResponses { CreateEntity = r });
-                        break;
-                    default:
-                        completer.Fail(r.StatusCode, r.Message);
-                        break;
-                }
+                return;
+            }
+
+            if (r.StatusCode == StatusCode.Success)
+            {
+                completer.Complete(new CommandResponses {CreateEntity = r});
+            }
+            else
+            {
+                completer.Fail(r.StatusCode, r.Message);
             }
         }
 
         private void CompleteCommand(DeleteEntityResponseOp r)
         {
-            if (requestsToComplete.TryRemove(r.RequestId, out var completer))
+            if (!requestsToComplete.TryRemove(r.RequestId, out var completer))
             {
-                switch (r.StatusCode)
-                {
-                    case StatusCode.Success:
-                        completer.Complete(new CommandResponses { DeleteEntity = r });
-                        break;
-                    default:
-                        completer.Fail(r.StatusCode, r.Message);
-                        break;
-                }
+                return;
+            }
+
+            if (r.StatusCode == StatusCode.Success)
+            {
+                completer.Complete(new CommandResponses {DeleteEntity = r});
+            }
+            else
+            {
+                completer.Fail(r.StatusCode, r.Message);
             }
         }
 
@@ -583,22 +588,26 @@ namespace Improbable.Stdlib
 
         private void ThrowIfNotConnected()
         {
-            if (GetConnectionStatusCode() != ConnectionStatusCode.Success)
+            if (GetConnectionStatusCode() == ConnectionStatusCode.Success)
             {
-                CancelCommands();
-
-                throw new InvalidOperationException("Not connected to SpatialOS");
+                return;
             }
+
+            CancelCommands();
+
+            throw new InvalidOperationException("Not connected to SpatialOS");
         }
 
         private void ThrowCommandFailedIfNotConnected()
         {
-            if (GetConnectionStatusCode() != ConnectionStatusCode.Success)
+            if (GetConnectionStatusCode() == ConnectionStatusCode.Success)
             {
-                CancelCommands();
-
-                throw new CommandFailedException(StatusCode.Timeout, "Not connected to SpatialOS");
+                return;
             }
+
+            CancelCommands();
+
+            throw new CommandFailedException(StatusCode.Timeout, "Not connected to SpatialOS");
         }
 
         private void CancelCommands()

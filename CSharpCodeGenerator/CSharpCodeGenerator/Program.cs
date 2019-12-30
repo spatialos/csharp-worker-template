@@ -10,11 +10,10 @@ using Improbable.Schema.Bundle;
 using Improbable.Stdlib.CSharpCodeGen;
 using Improbable.WorkerSdkInterop.CSharpCodeGen;
 using Serilog;
-using Serilog.Core;
 using static Improbable.CSharpCodeGen.Case;
 using Types = Improbable.CSharpCodeGen.Types;
 
-namespace CodeGenerator
+namespace CSharpCodeGenerator
 {
     public class Options
     {
@@ -54,7 +53,6 @@ namespace CodeGenerator
 
         private static void Run(Options options)
         {
-            
             Log.Information(Parser.Default.FormatCommandLine(options));
 
             var timer = new Stopwatch();
@@ -89,7 +87,7 @@ namespace CodeGenerator
                 {
                     baseGenerator,
                     new StdlibGenerator(bundle),
-                    new SchemaObjectGenerator(bundle),
+                    new SchemaObjectGenerator(bundle)
                 };
 
                 var allContent = new Dictionary<string, StringBuilder>();
@@ -110,19 +108,13 @@ namespace CodeGenerator
                     builder.AppendJoin(Environment.NewLine, generators.Select(g =>
                     {
                         var result = g.Generate(t).TrimEnd();
-                        if (string.IsNullOrWhiteSpace(result))
-                        {
-                            return string.Empty;
-                        }
-
-                        return $@"
+                        return string.IsNullOrWhiteSpace(result) ? string.Empty : $@"
 #region {g.GetType().FullName}
 
 {result}
 
 #endregion {g.GetType().FullName}
 ";
-
                     }).Where(s => !string.IsNullOrEmpty(s)));
 
                     // Nested types.

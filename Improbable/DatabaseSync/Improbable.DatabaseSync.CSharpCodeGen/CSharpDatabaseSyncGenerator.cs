@@ -34,7 +34,7 @@ namespace Improbable.DatabaseSync.CSharpCodeGen
             }
 
             var profileIdField = profileIdFields[0];
-            if (profileIdField.TypeSelector != FieldType.Singular || profileIdField.SingularType.Type.ValueTypeSelector != ValueType.Primitive || profileIdField.SingularType.Type.Primitive != PrimitiveType.String)
+            if (!profileIdField.IsSingular() || !profileIdField.HasPrimitive(PrimitiveType.String))
             {
                 throw new InvalidOperationException($"{profileIdField.Name} is annotated with {ProfileIdAnnotation}, which requires it to be a string type.");
             }

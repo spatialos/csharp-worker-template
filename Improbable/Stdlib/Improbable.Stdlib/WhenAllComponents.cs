@@ -55,7 +55,7 @@ namespace Improbable.Stdlib
                 return;
             }
 
-            if (!counts.TryGetValue(op.EntityId, out var count))
+            if (!counts.ContainsKey(op.EntityId))
             {
                 counts.Add(op.EntityId, 0);
             }

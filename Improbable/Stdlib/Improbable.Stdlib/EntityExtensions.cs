@@ -10,7 +10,11 @@ namespace Improbable.Stdlib
 
             foreach (var id in entity.GetComponentIds())
             {
-                copy.Add(entity.Get(id).Value.Acquire());
+                var componentData = entity.Get(id);
+                if (componentData.HasValue)
+                {
+                    copy.Add(componentData.Value.Acquire());
+                }
             }
 
             return copy;
@@ -20,7 +24,7 @@ namespace Improbable.Stdlib
         {
             foreach (var id in entity.GetComponentIds())
             {
-                entity.Get(id).Value.Release();
+                entity.Get(id)?.Release();
             }
         }
     }
