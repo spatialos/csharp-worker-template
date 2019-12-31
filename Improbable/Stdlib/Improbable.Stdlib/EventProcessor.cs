@@ -43,8 +43,10 @@ namespace Improbable.Stdlib
             while (true)
             {
                 cancellation.ThrowIfCancellationRequested();
+
                 while (eventBuffer.TryDequeue(out var evt))
                 {
+                    cancellation.ThrowIfCancellationRequested();
                     yield return evt;
                 }
 

@@ -9,9 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Google.Api.Gax;
 using Google.Api.Gax.Grpc;
-using Google.LongRunning;
 using Google.Protobuf.WellKnownTypes;
-using Grpc.Core;
 using Improbable.SpatialOS.Deployment.V1Alpha1;
 using Improbable.SpatialOS.Platform.Common;
 using Improbable.SpatialOS.PlayerAuth.V2Alpha1;
@@ -29,9 +27,9 @@ namespace Improbable.Stdlib.Platform
         private static string ToolbeltConfigDir =>
             Environment.GetEnvironmentVariable("IMPROBABLE_CONFIG_DIR") ?? (RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
                 ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), ".improbable")
-                : Path.Combine(Environment.GetEnvironmentVariable("HOME"), ".improbable"));
+                : Path.Combine(Environment.GetEnvironmentVariable("HOME") ?? ".", ".improbable"));
 
-        private static readonly PollSettings defaultPoll = new PollSettings(Expiration.FromTimeout(TimeSpan.FromMinutes(2)), TimeSpan.FromMilliseconds(100));
+        private static readonly PollSettings DefaultPoll = new PollSettings(Expiration.FromTimeout(TimeSpan.FromMinutes(2)), TimeSpan.FromMilliseconds(100));
 
         private static PlatformCredential GetCredentials()
         {
@@ -52,7 +50,7 @@ namespace Improbable.Stdlib.Platform
             Shell.Run("spatial", progress, "auth", "login", "--json_output");
 
             // The runtime creates a '.improbable' folder next to the spatialos.json file.
-            var rootDir = Path.GetDirectoryName(startDeployment.ProjectConfigPath);
+            var rootDir = Path.GetDirectoryName(startDeployment.ProjectConfigPath) ?? ".";
             var tempDir = Path.Combine(rootDir, ".improbable");
 
             Directory.CreateDirectory(tempDir);
@@ -119,7 +117,7 @@ namespace Improbable.Stdlib.Platform
                         }
                     }
                 }, CallSettings.FromCancellationToken(cancellation))
-                .PollUntilCompleted(defaultPoll);
+                .PollUntilCompleted(DefaultPoll);
 
             // Apply desired starting worker flags.
             if (startDeployment.WorkerFlags.Any())
@@ -192,57 +190,59 @@ namespace Improbable.Stdlib.Platform
                     RedirectStandardOutput = true
                 };
 
-                using (var process = Process.Start(processStartInfo))
+                using var process = Process.Start(processStartInfo);
+                if (process == null)
                 {
-                    if (process == null)
+                    throw new Exception($"Failed to start {command} {processStartInfo.Arguments}");
+                }
+
+                process.OutputDataReceived += (sender, eventArgs) =>
+                {
+                    if (string.IsNullOrEmpty(eventArgs.Data))
                     {
-                        throw new Exception($"Failed to start {command} {processStartInfo.Arguments}");
+                        return;
                     }
 
-                    process.OutputDataReceived += (sender, eventArgs) =>
+                    var obj = JObject.Parse(eventArgs.Data);
+
+                    if (obj.TryGetValue("msg", out var msgValue))
                     {
-                        if (!string.IsNullOrEmpty(eventArgs.Data))
-                        {
-                            var obj = JObject.Parse(eventArgs.Data);
-
-                            if (obj.TryGetValue("msg", out var msgValue))
-                            {
-                                progress?.Report(msgValue.Value<string>());
-                            }
-                            else
-                            {
-                                progress?.Report(eventArgs.Data);
-                            }
-                        }
-                    };
-
-                    process.ErrorDataReceived += (sender, eventArgs) =>
-                    {
-                        if (!string.IsNullOrEmpty(eventArgs.Data))
-                        {
-                            var obj = JObject.Parse(eventArgs.Data);
-
-                            if (obj.TryGetValue("msg", out var msgValue))
-                            {
-                                progress?.Report(msgValue.Value<string>());
-                            }
-                            else
-                            {
-                                progress?.Report(eventArgs.Data);
-                            }
-                        }
-                    };
-
-                    process.EnableRaisingEvents = true;
-                    process.BeginOutputReadLine();
-                    process.BeginErrorReadLine();
-
-                    process.WaitForExit();
-
-                    if (process.ExitCode != 0)
-                    {
-                        throw new Exception($"ExitCode {process.ExitCode}: {processStartInfo.FileName} {processStartInfo.Arguments}");
+                        progress?.Report(msgValue.Value<string>());
                     }
+                    else
+                    {
+                        progress?.Report(eventArgs.Data);
+                    }
+                };
+
+                process.ErrorDataReceived += (sender, eventArgs) =>
+                {
+                    if (string.IsNullOrEmpty(eventArgs.Data))
+                    {
+                        return;
+                    }
+
+                    var obj = JObject.Parse(eventArgs.Data);
+
+                    if (obj.TryGetValue("msg", out var msgValue))
+                    {
+                        progress?.Report(msgValue.Value<string>());
+                    }
+                    else
+                    {
+                        progress?.Report(eventArgs.Data);
+                    }
+                };
+
+                process.EnableRaisingEvents = true;
+                process.BeginOutputReadLine();
+                process.BeginErrorReadLine();
+
+                process.WaitForExit();
+
+                if (process.ExitCode != 0)
+                {
+                    throw new Exception($"ExitCode {process.ExitCode}: {processStartInfo.FileName} {processStartInfo.Arguments}");
                 }
             }
 
