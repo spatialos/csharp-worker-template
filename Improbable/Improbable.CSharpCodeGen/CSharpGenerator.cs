@@ -54,20 +54,14 @@ namespace Improbable.CSharpCodeGen
             var text = new StringBuilder();
             var typeName = GetPascalCaseNameFromTypeName(type.QualifiedName);
 
-            string innerType;
             var field = fields[0];
 
-            switch (field.TypeSelector)
+            var innerType = field.TypeSelector switch
             {
-                case FieldType.List:
-                    innerType = GetTypeAsCsharp(field.ListType.InnerType);
-                    break;
-                case FieldType.Map:
-                    innerType = $"global::System.Collections.Generic.KeyValuePair<{GetTypeAsCsharp(field.MapType.KeyType)}, {GetTypeAsCsharp(field.MapType.ValueType)}>";
-                    break;
-                default:
-                    throw new ArgumentOutOfRangeException();
-            }
+                FieldType.List => GetTypeAsCsharp(field.ListType.InnerType),
+                FieldType.Map => $"global::System.Collections.Generic.KeyValuePair<{GetTypeAsCsharp(field.MapType.KeyType)}, {GetTypeAsCsharp(field.MapType.ValueType)}>",
+                _ => throw new ArgumentOutOfRangeException()
+            };
 
             text.Append($@"
 public {typeName}(params {innerType}[] {FieldNameToSafeName(SnakeCaseToCamelCase(field.Name))})
@@ -146,7 +140,7 @@ public static bool operator !=({typeName} a, {typeName} b)
 ";
         }
 
-        private string GenerateFields(TypeDescription type, IReadOnlyList<FieldDefinition> fields)
+        private string GenerateFields(TypeDescription type, IEnumerable<FieldDefinition> fields)
         {
             var fieldText = new StringBuilder();
             foreach (var field in fields)

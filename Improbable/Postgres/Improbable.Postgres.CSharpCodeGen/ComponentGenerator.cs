@@ -93,24 +93,20 @@ CREATE TRIGGER notify_{{tableName}}_tgr
 ";
         }
 
-        private static string CreateReader(TypeDescription type, IReadOnlyList<FieldDefinition> fields)
+        private static string CreateReader(TypeDescription type, IEnumerable<FieldDefinition> fields)
         {
             var sb = new StringBuilder();
             foreach (var field in fields)
             {
                 var ordinal = $"{SnakeCaseToPascalCase(field.Name)}Ordinal";
-
-                switch (field.TypeSelector)
+                var toAdd = field.TypeSelector switch
                 {
-                    case FieldType.Option:
-                        sb.AppendLine($"reader.IsDBNull({ordinal}) ? null : ({GetFieldTypeAsCsharp(type, field)}) reader.{Types.SchemaToReaderMethod[field.OptionType.InnerType.Primitive]}({ordinal}),");
-                        break;
-                    case FieldType.Singular:
-                        sb.AppendLine($"reader.{Types.SchemaToReaderMethod[field.SingularType.Type.Primitive]}({ordinal}),");
-                        break;
-                    default:
-                        throw new ArgumentOutOfRangeException();
-                }
+                    FieldType.Option => $"reader.IsDBNull({ordinal}) ? null : ({GetFieldTypeAsCsharp(type, field)}) reader.{Types.SchemaToReaderMethod[field.OptionType.InnerType.Primitive]}({ordinal}),",
+                    FieldType.Singular => $"reader.{Types.SchemaToReaderMethod[field.SingularType.Type.Primitive]}({ordinal}),",
+                    _ => throw new ArgumentOutOfRangeException()
+                };
+
+                sb.AppendLine(toAdd);
             }
 
             return sb.ToString().TrimEnd().TrimEnd(',');
@@ -121,32 +117,30 @@ CREATE TRIGGER notify_{{tableName}}_tgr
             switch (f.TypeSelector)
             {
                 case FieldType.Option:
-                    switch (f.OptionType.InnerType.ValueTypeSelector)
+                    if (f.OptionType.InnerType.ValueTypeSelector == ValueType.Primitive)
                     {
-                        case ValueType.Primitive:
-                            if (f.OptionType.InnerType.Primitive == PrimitiveType.String)
-                            {
-                                return "::text";
-                            }
-
-                            break;
-                        default:
-                            throw new InvalidOperationException("Don't know how to convert this type from Postgres");
+                        if (f.OptionType.InnerType.Primitive == PrimitiveType.String)
+                        {
+                            return "::text";
+                        }
+                    }
+                    else
+                    {
+                        throw new InvalidOperationException("Don't know how to convert this type from Postgres");
                     }
 
                     break;
                 case FieldType.Singular:
-                    switch (f.SingularType.Type.ValueTypeSelector)
+                    if (f.SingularType.Type.ValueTypeSelector == ValueType.Primitive)
                     {
-                        case ValueType.Primitive:
-                            if (f.SingularType.Type.Primitive == PrimitiveType.String)
-                            {
-                                return "::text";
-                            }
-
-                            break;
-                        default:
-                            throw new InvalidOperationException("Don't know how to convert this type from Postgres");
+                        if (f.SingularType.Type.Primitive == PrimitiveType.String)
+                        {
+                            return "::text";
+                        }
+                    }
+                    else
+                    {
+                        throw new InvalidOperationException("Don't know how to convert this type from Postgres");
                     }
 
                     break;
@@ -157,7 +151,7 @@ CREATE TRIGGER notify_{{tableName}}_tgr
             return string.Empty;
         }
 
-        private static string CreateColumns(string outerType, IReadOnlyList<FieldDefinition> fields)
+        private static string CreateColumns(string outerType, IEnumerable<FieldDefinition> fields)
         {
             var columnCreator = new StringBuilder();
 
@@ -169,36 +163,24 @@ CREATE TRIGGER notify_{{tableName}}_tgr
                     switch (field.TypeSelector)
                     {
                         case FieldType.Option:
-                            switch (field.OptionType.InnerType.ValueTypeSelector)
+                            databaseType = field.OptionType.InnerType.ValueTypeSelector switch
                             {
-                                case ValueType.Enum:
-                                    databaseType = "integer";
-                                    break;
-                                case ValueType.Primitive:
-                                    databaseType = Types.SchemaToPostgresTypes[field.OptionType.InnerType.Primitive];
-                                    break;
-                                case ValueType.Type:
-                                    throw new Exception("Compound types are not supported");
-                                default:
-                                    throw new ArgumentOutOfRangeException();
-                            }
+                                ValueType.Enum => "integer",
+                                ValueType.Primitive => Types.SchemaToPostgresTypes[field.OptionType.InnerType.Primitive],
+                                ValueType.Type => throw new Exception("Compound types are not supported"),
+                                _ => throw new ArgumentOutOfRangeException()
+                            };
 
                             break;
 
                         case FieldType.List:
-                            switch (field.ListType.InnerType.ValueTypeSelector)
+                            databaseType = field.ListType.InnerType.ValueTypeSelector switch
                             {
-                                case ValueType.Enum:
-                                    databaseType = "integer[] not null";
-                                    break;
-                                case ValueType.Primitive:
-                                    databaseType = $"{Types.SchemaToPostgresTypes[field.ListType.InnerType.Primitive]}[] not null";
-                                    break;
-                                case ValueType.Type:
-                                    throw new Exception("Compound types are not supported");
-                                default:
-                                    throw new ArgumentOutOfRangeException();
-                            }
+                                ValueType.Enum => "integer[] not null",
+                                ValueType.Primitive => $"{Types.SchemaToPostgresTypes[field.ListType.InnerType.Primitive]}[] not null",
+                                ValueType.Type => throw new Exception("Compound types are not supported"),
+                                _ => throw new ArgumentOutOfRangeException()
+                            };
 
                             break;
 
@@ -206,19 +188,13 @@ CREATE TRIGGER notify_{{tableName}}_tgr
                             throw new InvalidOperationException($"{outerType}.{field.Name}: Maps are not supported.");
 
                         case FieldType.Singular:
-                            switch (field.SingularType.Type.ValueTypeSelector)
+                            databaseType = field.SingularType.Type.ValueTypeSelector switch
                             {
-                                case ValueType.Enum:
-                                    databaseType = "integer";
-                                    break;
-                                case ValueType.Primitive:
-                                    databaseType = Types.SchemaToPostgresTypes[field.SingularType.Type.Primitive];
-                                    break;
-                                case ValueType.Type:
-                                    throw new Exception("Compound types are not supported");
-                                default:
-                                    throw new ArgumentOutOfRangeException();
-                            }
+                                ValueType.Enum => "integer",
+                                ValueType.Primitive => Types.SchemaToPostgresTypes[field.SingularType.Type.Primitive],
+                                ValueType.Type => throw new Exception("Compound types are not supported"),
+                                _ => throw new ArgumentOutOfRangeException()
+                            };
 
                             databaseType += " not null";
                             break;

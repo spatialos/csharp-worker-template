@@ -38,23 +38,16 @@ namespace Improbable.Postgres
                 return false;
             }
 
-            switch (level)
+            return level switch
             {
-                case NpgsqlLogLevel.Trace:
-                    return logger.IsEnabled(LogEventLevel.Verbose);
-                case NpgsqlLogLevel.Debug:
-                    return logger.IsEnabled(LogEventLevel.Debug);
-                case NpgsqlLogLevel.Info:
-                    return logger.IsEnabled(LogEventLevel.Information);
-                case NpgsqlLogLevel.Warn:
-                    return logger.IsEnabled(LogEventLevel.Warning);
-                case NpgsqlLogLevel.Error:
-                    return logger.IsEnabled(LogEventLevel.Error);
-                case NpgsqlLogLevel.Fatal:
-                    return logger.IsEnabled(LogEventLevel.Fatal);
-                default:
-                    throw new ArgumentOutOfRangeException(nameof(level), level, null);
-            }
+                NpgsqlLogLevel.Trace => logger.IsEnabled(LogEventLevel.Verbose),
+                NpgsqlLogLevel.Debug => logger.IsEnabled(LogEventLevel.Debug),
+                NpgsqlLogLevel.Info => logger.IsEnabled(LogEventLevel.Information),
+                NpgsqlLogLevel.Warn => logger.IsEnabled(LogEventLevel.Warning),
+                NpgsqlLogLevel.Error => logger.IsEnabled(LogEventLevel.Error),
+                NpgsqlLogLevel.Fatal => logger.IsEnabled(LogEventLevel.Fatal),
+                _ => throw new ArgumentOutOfRangeException(nameof(level), level, null)
+            };
         }
 
         public override void Log(NpgsqlLogLevel level, int connectorId, string msg, Exception exception = null)
