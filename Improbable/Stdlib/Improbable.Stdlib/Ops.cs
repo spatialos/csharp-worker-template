@@ -9,7 +9,7 @@ namespace Improbable.Stdlib
     {
         public readonly List<Op> Ops;
 
-        private readonly Worker.CInterop.OpList rawOps;
+        private readonly Worker.CInterop.OpList? rawOps;
 
         public OpList()
         {
@@ -86,7 +86,7 @@ namespace Improbable.Stdlib
 
         public void Dispose()
         {
-            rawOps.Dispose();
+            rawOps?.Dispose();
         }
 
         public IEnumerator<Op> GetEnumerator()

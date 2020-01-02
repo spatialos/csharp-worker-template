@@ -486,7 +486,7 @@ public global::Improbable.Worker.CInterop.ComponentData ToData()
     var schemaData = global::Improbable.Worker.CInterop.SchemaComponentData.Create();
     ApplyToSchemaObject(schemaData.GetFields());
 
-    return new global::Improbable.Worker.CInterop.ComponentData({componentId}, schemaData);
+    return new global::Improbable.Worker.CInterop.ComponentData(ComponentId, schemaData);
 }}");
 
             return text.ToString();

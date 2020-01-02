@@ -23,8 +23,8 @@ namespace Improbable.Stdlib.Project
 
         public readonly LaunchConfig LaunchConfig;
 
-        public StartDeploymentOptions(string launchConfigPath, string projectConfigPath, string snapshotId, IEnumerable<string> tags = null,
-            IEnumerable<DeploymentWorkerFlags> workerFlags = null)
+        public StartDeploymentOptions(string launchConfigPath, string projectConfigPath, string snapshotId, IEnumerable<string>? tags = null,
+            IEnumerable<DeploymentWorkerFlags>? workerFlags = null)
         {
             LaunchConfigPath = launchConfigPath ?? throw new ArgumentNullException(nameof(launchConfigPath));
             ProjectConfigPath = projectConfigPath ?? throw new ArgumentNullException(nameof(projectConfigPath));

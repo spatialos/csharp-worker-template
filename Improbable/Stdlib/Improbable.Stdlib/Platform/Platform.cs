@@ -42,7 +42,7 @@ namespace Improbable.Stdlib.Platform
             return new PlatformApiChannel(GetCredentials(), new PlatformApiEndpoint("localhost", 9876, true));
         }
 
-        public static async Task<Deployment> StartLocalAsync(StartDeploymentOptions startDeployment, CancellationToken cancellation = default, IProgress<string> progress = null)
+        public static async Task<Deployment> StartLocalAsync(StartDeploymentOptions startDeployment, CancellationToken cancellation = default, IProgress<string>? progress = null)
         {
             var client = DeploymentServiceClient.Create(GetLocalApiChannel());
 
@@ -141,7 +141,7 @@ namespace Improbable.Stdlib.Platform
             return response.Result;
         }
 
-        public static async Task StopLocalAsync(ProjectConfig config, CancellationToken cancellation = default, IProgress<string> progress = null)
+        public static async Task StopLocalAsync(ProjectConfig config, CancellationToken cancellation = default, IProgress<string>? progress = null)
         {
             var client = DeploymentServiceClient.Create(GetLocalApiChannel());
 
@@ -155,7 +155,7 @@ namespace Improbable.Stdlib.Platform
             var tasks = new List<Task>();
             foreach (var dpl in deployments)
             {
-                progress.Report($"Stopping {dpl.Id}...");
+                progress?.Report($"Stopping {dpl.Id}...");
                 tasks.Add(client.DeleteDeploymentAsync(new DeleteDeploymentRequest { Id = dpl.Id }, CallSettings.FromCancellationToken(cancellation)));
             }
 
@@ -180,7 +180,7 @@ namespace Improbable.Stdlib.Platform
         // Hide this away until we don't need to call out to spatial any more.
         private static class Shell
         {
-            public static void Run(string command, IProgress<string> progress, params string[] args)
+            public static void Run(string command, IProgress<string>? progress, params string[] args)
             {
                 var processStartInfo = new ProcessStartInfo(command, string.Join(" ", args))
                 {

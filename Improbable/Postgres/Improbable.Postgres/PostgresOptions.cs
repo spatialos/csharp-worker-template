@@ -13,7 +13,7 @@ namespace Improbable.Postgres
         public const string DatabaseFlagName = "postgres_database";
         public const string AdditionalFlagName = "postgres_additional";
 
-        private string cachedConnectionString;
+        private string? cachedConnectionString;
         private readonly object rootLock = new object();
 
         private readonly Dictionary<string, string> flagValues = new Dictionary<string, string>
@@ -189,7 +189,7 @@ namespace Improbable.Postgres
         {
             foreach (var key in keys)
             {
-                string value = null;
+                var value = "";
                 if (!opList.TryGetWorkerFlagChange(key, ref value))
                 {
                     continue;

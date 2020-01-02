@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <Version>0.0.2-preview</Version>

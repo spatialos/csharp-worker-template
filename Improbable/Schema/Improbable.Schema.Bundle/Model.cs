@@ -33,7 +33,7 @@ namespace Improbable.Schema.Bundle
         Type
     }
 
-    public class TypeReference
+    public struct TypeReference
     {
         public string Enum;
         public PrimitiveType Primitive;
@@ -63,7 +63,7 @@ namespace Improbable.Schema.Bundle
         }
     }
 
-    public class Value
+    public struct Value
     {
         public bool BoolValue;
         public string BytesValue;
@@ -87,12 +87,12 @@ namespace Improbable.Schema.Bundle
             public Value Value;
         }
 
-        public class ListValueHolder
+        public struct ListValueHolder
         {
             public IReadOnlyList<Value> Values;
         }
 
-        public class MapValueHolder
+        public struct MapValueHolder
         {
             public IReadOnlyList<MapPairValue> Values;
 
@@ -104,7 +104,7 @@ namespace Improbable.Schema.Bundle
         }
     }
 
-    public class SchemaEnumValue
+    public struct SchemaEnumValue
     {
         public string Enum;
         public string EnumValue;
@@ -113,13 +113,13 @@ namespace Improbable.Schema.Bundle
         public string Value;
     }
 
-    public class TypeValue
+    public struct TypeValue
     {
         public IReadOnlyList<FieldValue> Fields;
 
         public string Type;
 
-        public class FieldValue
+        public struct FieldValue
         {
             public string Name;
             public SourceReference SourceReference;
@@ -127,13 +127,13 @@ namespace Improbable.Schema.Bundle
         }
     }
 
-    public class Annotation
+    public struct Annotation
     {
         public SourceReference SourceReference;
         public TypeValue TypeValue;
     }
 
-    public class EnumValueDefinition
+    public struct EnumValueDefinition
     {
         public IReadOnlyList<Annotation> Annotations;
         public string Name;
@@ -143,7 +143,7 @@ namespace Improbable.Schema.Bundle
     }
 
     [DebuggerDisplay("{" + nameof(QualifiedName) + "}")]
-    public class EnumDefinition
+    public struct EnumDefinition
     {
         public IReadOnlyList<Annotation> Annotations;
         public string Name;
@@ -162,7 +162,7 @@ namespace Improbable.Schema.Bundle
     }
 
     [DebuggerDisplay("{" + nameof(Name) + "}" + " ({" + nameof(FieldId) + "})")]
-    public class FieldDefinition
+    public struct FieldDefinition
     {
         public IReadOnlyList<Annotation> Annotations;
 
@@ -230,7 +230,7 @@ namespace Improbable.Schema.Bundle
     }
 
     [DebuggerDisplay("{" + nameof(QualifiedName) + "}")]
-    public class TypeDefinition
+    public struct TypeDefinition
     {
         public IReadOnlyList<Annotation> Annotations;
         public IReadOnlyList<FieldDefinition> Fields;
@@ -241,7 +241,7 @@ namespace Improbable.Schema.Bundle
     }
 
     [DebuggerDisplay("{" + nameof(QualifiedName) + "} {" + nameof(ComponentId) + "}")]
-    public class ComponentDefinition
+    public struct ComponentDefinition
     {
         public IReadOnlyList<Annotation> Annotations;
         public IReadOnlyList<CommandDefinition> Commands;
@@ -257,7 +257,7 @@ namespace Improbable.Schema.Bundle
         public SourceReference SourceReference;
 
         [DebuggerDisplay("{" + nameof(QualifiedName) + "}")]
-        public class EventDefinition
+        public struct EventDefinition
         {
             public IReadOnlyList<Annotation> Annotations;
             public uint EventIndex;
@@ -267,7 +267,7 @@ namespace Improbable.Schema.Bundle
         }
 
         [DebuggerDisplay("{" + nameof(QualifiedName) + "}" + " {" + nameof(CommandIndex) + "}")]
-        public class CommandDefinition
+        public struct CommandDefinition
         {
             public IReadOnlyList<Annotation> Annotations;
             public uint CommandIndex;
@@ -279,30 +279,30 @@ namespace Improbable.Schema.Bundle
         }
     }
 
-    public class SourceReference
+    public struct SourceReference
     {
         public uint Column;
         public uint Line;
     }
 
-    public class SchemaBundle
+    public struct SchemaBundle
     {
         public IReadOnlyList<SchemaFile> SchemaFiles;
     }
 
-    public class Package
+    public struct Package
     {
         public string Name;
         public SourceReference SourceReference;
     }
 
-    public class Import
+    public struct Import
     {
         public string Path;
         public SourceReference SourceReference;
     }
 
-    public class SchemaFile
+    public struct SchemaFile
     {
         public string CanonicalPath;
         public IReadOnlyList<ComponentDefinition> Components;

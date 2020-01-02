@@ -9,9 +9,9 @@ namespace Improbable.Postgres
 {
     public class MetricsPusher : IDisposable
     {
-        private CancellationTokenSource metricsCancellationTokenSource;
+        private CancellationTokenSource? metricsCancellationTokenSource;
         private readonly PostgresOptions postgresOptions;
-        private Task metricsPusherTask;
+        private Task? metricsPusherTask;
 
         public MetricsPusher(PostgresOptions options)
         {

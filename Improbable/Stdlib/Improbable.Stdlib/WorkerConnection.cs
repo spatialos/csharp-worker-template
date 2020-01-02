@@ -17,15 +17,15 @@ namespace Improbable.Stdlib
     public class WorkerConnection : IDisposable
     {
         private readonly ConcurrentDictionary<long, TaskHandler> requestsToComplete = new ConcurrentDictionary<long, TaskHandler>();
-        private Connection connection;
-        private Task metricsTask;
-        private CancellationTokenSource metricsTcs = new CancellationTokenSource();
-        private string workerId;
+        private readonly Connection connection;
+        private Task? metricsTask;
+        private CancellationTokenSource? metricsTcs;
+        private string? workerId;
         private readonly object connectionLock = new object();
 
         private WorkerConnection(Connection connection)
         {
-            this.connection = connection ?? throw new ArgumentNullException(nameof(connection));
+            this.connection = connection;
         }
 
         public string WorkerId
@@ -49,8 +49,7 @@ namespace Improbable.Stdlib
                 StopSendingMetrics();
                 CancelCommands();
 
-                connection?.Dispose();
-                connection = null;
+                connection.Dispose();
             }
 
         }
@@ -109,7 +108,12 @@ namespace Improbable.Stdlib
             using var future = locator.ConnectAsync(connectionParameters);
             var connection = await future.ToTask(cancellation);
 
-            if (connection != null && connection.GetConnectionStatusCode() != ConnectionStatusCode.Success)
+            if (connection == null)
+            {
+                throw new Exception("Connection is null");
+            }
+
+            if (connection.GetConnectionStatusCode() != ConnectionStatusCode.Success)
             {
                 throw new Exception($"{connection.GetConnectionStatusCode()}: {connection.GetConnectionStatusCodeDetailString()}");
             }
@@ -123,6 +127,8 @@ namespace Improbable.Stdlib
             {
                 throw new InvalidOperationException("Metrics are already being sent");
             }
+
+            metricsTcs = new CancellationTokenSource();
 
             metricsTask = Task.Factory.StartNew(async unused =>
             {
@@ -167,9 +173,9 @@ namespace Improbable.Stdlib
             }
 
             metricsTcs?.Dispose();
+            metricsTcs = null;
 
             metricsTask = null;
-            metricsTcs = null;
         }
 
         private static string GetDevelopmentPlayerIdentityToken(string host, ushort port, bool useInsecureConnection, string authToken, string playerId, string displayName)
@@ -263,7 +269,7 @@ namespace Improbable.Stdlib
                 requestId = connection.SendCommandRequest(entityId.Value, new CommandRequest(componentId, commandIndex, request), timeout, parameters);
             }
 
-            if (!requestsToComplete.TryAdd(requestId, new TaskHandler { Complete = complete, Fail = fail }))
+            if (!requestsToComplete.TryAdd(requestId, new TaskHandler(complete, fail)))
             {
                 throw new InvalidOperationException("Key already exists");
             }
@@ -341,7 +347,7 @@ namespace Improbable.Stdlib
                 completion.TrySetException(new CommandFailedException(code, message));
             }
 
-            if (!requestsToComplete.TryAdd(id, new TaskHandler { Complete = Complete, Fail = Fail }))
+            if (!requestsToComplete.TryAdd(id, new TaskHandler(Complete, Fail)))
             {
                 throw new InvalidOperationException("Key already exists");
             }
@@ -521,7 +527,7 @@ namespace Improbable.Stdlib
                     yield break;
                 }
 
-                OpList opList = null;
+                OpList? opList = null;
 
                 try
                 {
@@ -643,8 +649,14 @@ namespace Improbable.Stdlib
 
         private class TaskHandler
         {
-            public Action<CommandResponses> Complete;
-            public Action<StatusCode, string> Fail;
+            public Action<CommandResponses> Complete { get; private set; }
+            public Action<StatusCode, string> Fail { get; private set; }
+
+            public TaskHandler(Action<CommandResponses> complete, Action<StatusCode, string> fail)
+            {
+                Complete = complete;
+                Fail = fail;
+            }
         }
     }
 }

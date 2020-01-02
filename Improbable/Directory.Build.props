@@ -13,5 +13,7 @@
     <Copyright>Improbable Worlds, Ltd</Copyright>
 
     <NoWarn>NU5127;NU5128;$(NoWarn)</NoWarn>
+    <Nullable>enable</Nullable>
+
   </PropertyGroup>
 </Project>

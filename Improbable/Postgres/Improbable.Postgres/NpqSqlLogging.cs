@@ -50,7 +50,7 @@ namespace Improbable.Postgres
             };
         }
 
-        public override void Log(NpgsqlLogLevel level, int connectorId, string msg, Exception exception = null)
+        public override void Log(NpgsqlLogLevel level, int connectorId, string msg, Exception? exception = null)
         {
             if ((int) level < (int) minLevel)
             {

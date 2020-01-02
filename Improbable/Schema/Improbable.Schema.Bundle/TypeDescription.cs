@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -44,45 +43,36 @@ namespace Improbable.Schema.Bundle
 
             NestedEnums = bundle.Enums.Where(e => e.Value.OuterType == qualifiedName).Select(type => bundle.Enums[type.Key]).ToList();
 
-            bundle.Components.TryGetValue(qualifiedName, out var component);
-            ComponentId = component?.ComponentId;
-
-            SourceFile = bundle.TypeToFile[qualifiedName];
-
-            if (ComponentId.HasValue)
+            if (bundle.Components.TryGetValue(qualifiedName, out var component))
             {
+                ComponentId = component.ComponentId;
+
                 SourceReference = bundle.Components[qualifiedName].SourceReference;
-                OuterType = string.Empty;
+                OuterType = "";
+
+                Events = component.Events;
+                Annotations = component.Annotations;
+
+                Fields = !string.IsNullOrEmpty(component.DataDefinition) ? bundle.Types[component.DataDefinition].Fields : bundle.Components[qualifiedName].Fields;
             }
             else
             {
                 SourceReference = bundle.Types[qualifiedName].SourceReference;
                 OuterType = bundle.Types[qualifiedName].OuterType;
+
+                Fields = bundle.Types[qualifiedName].Fields;
+                Annotations = bundle.Types[qualifiedName].Annotations;
+                Events = new List<ComponentDefinition.EventDefinition>();
+                ComponentId = null;
             }
+
+            SourceFile = bundle.TypeToFile[qualifiedName];
 
             NestedTypes = bundle.Types.Where(t => t.Value.OuterType == qualifiedName).Select(type =>
             {
                 var t = bundle.Types[type.Key];
                 return new TypeDescription(t.QualifiedName, bundle);
             }).ToList();
-
-            Fields = component?.Fields;
-
-            if (!string.IsNullOrEmpty(component?.DataDefinition))
-            {
-                // Inline fields into the component.
-                Fields = bundle.Types[component.DataDefinition].Fields;
-            }
-
-            if (Fields == null)
-            {
-                Fields = ComponentId.HasValue ? bundle.Components[qualifiedName].Fields : bundle.Types[qualifiedName].Fields;
-            }
-
-            if (Fields == null)
-            {
-                throw new Exception("Internal error: no fields found");
-            }
 
             var warnings = new List<string>();
             Warnings = warnings;
@@ -98,9 +88,6 @@ namespace Improbable.Schema.Bundle
 
                 return allowed;
             }).ToList();
-
-            Annotations = component != null ? component.Annotations : bundle.Types[qualifiedName].Annotations;
-            Events = component?.Events;
         }
 
         private static bool IsPrimitiveEntityField(FieldDefinition f)
