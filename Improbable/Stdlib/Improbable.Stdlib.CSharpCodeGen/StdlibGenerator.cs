@@ -53,7 +53,7 @@ namespace Improbable.Stdlib.CSharpCodeGen
 
         private static string GenerateEventProcessors(TypeDescription type)
         {
-            if (type.Events == null || type.Events.Count == 0)
+            if (type.Events.IsEmpty)
             {
                 return string.Empty;
             }

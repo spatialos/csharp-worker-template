@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Linq;
 
@@ -15,17 +16,17 @@ namespace Improbable.Schema.Bundle
 
         public readonly SchemaFile SourceFile;
 
-        public readonly IReadOnlyList<TypeDescription> NestedTypes;
+        public readonly ImmutableList<TypeDescription> NestedTypes;
 
-        public readonly IReadOnlyList<EnumDefinition> NestedEnums;
+        public readonly ImmutableArray<EnumDefinition> NestedEnums;
 
-        public readonly IReadOnlyList<FieldDefinition> Fields;
+        public readonly ImmutableArray<FieldDefinition> Fields;
 
-        public readonly IReadOnlyList<Annotation> Annotations;
+        public readonly ImmutableArray<Annotation> Annotations;
 
-        public readonly IReadOnlyList<ComponentDefinition.EventDefinition> Events;
+        public readonly ImmutableArray<ComponentDefinition.EventDefinition> Events;
 
-        public readonly IReadOnlyList<string> Warnings;
+        public readonly ImmutableArray<string> Warnings;
 
         public readonly uint? ComponentId;
 
@@ -41,7 +42,7 @@ namespace Improbable.Schema.Bundle
 
             IsRestricted = qualifiedName.StartsWith("improbable.restricted");
 
-            NestedEnums = bundle.Enums.Where(e => e.Value.OuterType == qualifiedName).Select(type => bundle.Enums[type.Key]).ToList();
+            NestedEnums = ImmutableArray.CreateRange(bundle.Enums.Where(e => e.Value.OuterType == qualifiedName).Select(type => bundle.Enums[type.Key]));
 
             if (bundle.Components.TryGetValue(qualifiedName, out var component))
             {
@@ -62,32 +63,31 @@ namespace Improbable.Schema.Bundle
 
                 Fields = bundle.Types[qualifiedName].Fields;
                 Annotations = bundle.Types[qualifiedName].Annotations;
-                Events = new List<ComponentDefinition.EventDefinition>();
                 ComponentId = null;
             }
 
             SourceFile = bundle.TypeToFile[qualifiedName];
 
-            NestedTypes = bundle.Types.Where(t => t.Value.OuterType == qualifiedName).Select(type =>
+            NestedTypes = ImmutableList.CreateRange(bundle.Types.Where(t => t.Value.OuterType == qualifiedName).Select(type =>
             {
                 var t = bundle.Types[type.Key];
                 return new TypeDescription(t.QualifiedName, bundle);
-            }).ToList();
+            }));
 
-            var warnings = new List<string>();
-            Warnings = warnings;
-
-            Fields = Fields.Where(f =>
+            var warnings = ImmutableArray<string>.Empty;
+            Fields = ImmutableArray.CreateRange(Fields.Where(f =>
             {
                 var allowed = !IsPrimitiveEntityField(f);
 
                 if (!allowed)
                 {
-                    warnings.Add($"field '{qualifiedName}.{f.Name}' is the Entity type, which is currently unsupported.");
+                    warnings = warnings.Add($"field '{qualifiedName}.{f.Name}' is the Entity type, which is currently unsupported.");
                 }
 
                 return allowed;
-            }).ToList();
+            }));
+
+            Warnings = warnings;
         }
 
         private static bool IsPrimitiveEntityField(FieldDefinition f)

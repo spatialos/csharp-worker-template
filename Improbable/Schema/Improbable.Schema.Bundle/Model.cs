@@ -1,5 +1,5 @@
 using System;
-using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Diagnostics;
 
 namespace Improbable.Schema.Bundle
@@ -89,12 +89,12 @@ namespace Improbable.Schema.Bundle
 
         public struct ListValueHolder
         {
-            public IReadOnlyList<Value> Values;
+            public ImmutableList<Value> Values;
         }
 
         public struct MapValueHolder
         {
-            public IReadOnlyList<MapPairValue> Values;
+            public ImmutableArray<MapPairValue> Values;
 
             public class MapPairValue
             {
@@ -115,7 +115,7 @@ namespace Improbable.Schema.Bundle
 
     public struct TypeValue
     {
-        public IReadOnlyList<FieldValue> Fields;
+        public ImmutableList<FieldValue> Fields;
 
         public string Type;
 
@@ -135,7 +135,7 @@ namespace Improbable.Schema.Bundle
 
     public struct EnumValueDefinition
     {
-        public IReadOnlyList<Annotation> Annotations;
+        public ImmutableArray<Annotation> Annotations;
         public string Name;
         public SourceReference SourceReference;
 
@@ -145,12 +145,12 @@ namespace Improbable.Schema.Bundle
     [DebuggerDisplay("{" + nameof(QualifiedName) + "}")]
     public struct EnumDefinition
     {
-        public IReadOnlyList<Annotation> Annotations;
+        public ImmutableArray<Annotation> Annotations;
         public string Name;
         public string OuterType;
         public string QualifiedName;
         public SourceReference SourceReference;
-        public IReadOnlyList<EnumValueDefinition> Values;
+        public ImmutableArray<EnumValueDefinition> Values;
     }
 
     public enum FieldType
@@ -164,7 +164,7 @@ namespace Improbable.Schema.Bundle
     [DebuggerDisplay("{" + nameof(Name) + "}" + " ({" + nameof(FieldId) + "})")]
     public struct FieldDefinition
     {
-        public IReadOnlyList<Annotation> Annotations;
+        public ImmutableArray<Annotation> Annotations;
 
         public uint FieldId;
 
@@ -232,8 +232,8 @@ namespace Improbable.Schema.Bundle
     [DebuggerDisplay("{" + nameof(QualifiedName) + "}")]
     public struct TypeDefinition
     {
-        public IReadOnlyList<Annotation> Annotations;
-        public IReadOnlyList<FieldDefinition> Fields;
+        public ImmutableArray<Annotation> Annotations;
+        public ImmutableArray<FieldDefinition> Fields;
         public string Name;
         public string OuterType;
         public string QualifiedName;
@@ -243,14 +243,14 @@ namespace Improbable.Schema.Bundle
     [DebuggerDisplay("{" + nameof(QualifiedName) + "} {" + nameof(ComponentId) + "}")]
     public struct ComponentDefinition
     {
-        public IReadOnlyList<Annotation> Annotations;
-        public IReadOnlyList<CommandDefinition> Commands;
+        public ImmutableArray<Annotation> Annotations;
+        public ImmutableArray<CommandDefinition> Commands;
         public uint ComponentId;
 
         public string DataDefinition;
-        public IReadOnlyList<EventDefinition> Events;
+        public ImmutableArray<EventDefinition> Events;
 
-        public IReadOnlyList<FieldDefinition> Fields;
+        public ImmutableArray<FieldDefinition> Fields;
         public string Name;
 
         public string QualifiedName;
@@ -259,7 +259,7 @@ namespace Improbable.Schema.Bundle
         [DebuggerDisplay("{" + nameof(QualifiedName) + "}")]
         public struct EventDefinition
         {
-            public IReadOnlyList<Annotation> Annotations;
+            public ImmutableArray<Annotation> Annotations;
             public uint EventIndex;
             public string Name;
             public SourceReference SourceReference;
@@ -269,7 +269,7 @@ namespace Improbable.Schema.Bundle
         [DebuggerDisplay("{" + nameof(QualifiedName) + "}" + " {" + nameof(CommandIndex) + "}")]
         public struct CommandDefinition
         {
-            public IReadOnlyList<Annotation> Annotations;
+            public ImmutableArray<Annotation> Annotations;
             public uint CommandIndex;
 
             public string Name;
@@ -287,7 +287,7 @@ namespace Improbable.Schema.Bundle
 
     public struct SchemaBundle
     {
-        public IReadOnlyList<SchemaFile> SchemaFiles;
+        public ImmutableArray<SchemaFile> SchemaFiles;
     }
 
     public struct Package
@@ -305,10 +305,10 @@ namespace Improbable.Schema.Bundle
     public struct SchemaFile
     {
         public string CanonicalPath;
-        public IReadOnlyList<ComponentDefinition> Components;
-        public IReadOnlyList<EnumDefinition> Enums;
-        public IReadOnlyList<Import> Imports;
+        public ImmutableArray<ComponentDefinition> Components;
+        public ImmutableArray<EnumDefinition> Enums;
+        public ImmutableArray<Import> Imports;
         public Package Package;
-        public IReadOnlyList<TypeDefinition> Types;
+        public ImmutableArray<TypeDefinition> Types;
     }
 }

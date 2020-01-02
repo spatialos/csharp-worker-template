@@ -30,7 +30,6 @@ namespace Improbable.WorkerSdkInterop.CSharpCodeGen
 
             content.AppendLine(GenerateSchemaConstructor(type, filteredFields).TrimEnd());
             content.AppendLine(GenerateApplyToSchemaObject(filteredFields).TrimEnd());
-            content.AppendLine(GenerateUpdaters(filteredFields).TrimEnd());
             content.AppendLine(GenerateConstructor(type, filteredFields));
 
             if (type.ComponentId.HasValue)
@@ -41,6 +40,7 @@ namespace Improbable.WorkerSdkInterop.CSharpCodeGen
                 if (!type.IsRestricted)
                 {
                     // Workers can't construct or send updates for restricted components.
+                    content.AppendLine(GenerateUpdaters(filteredFields).TrimEnd());
                     content.AppendLine(GenerateUpdateStruct(type, filteredFields));
                 }
             }
@@ -667,7 +667,7 @@ internal static void Update{SnakeCaseToPascalCase(field.Name)}({SchemaComponentU
 
         private static string GenerateCreateGetEvents(IReadOnlyCollection<ComponentDefinition.EventDefinition> events)
         {
-            if (events == null || events.Count == 0)
+            if (events.Count == 0)
             {
                 return string.Empty;
             }

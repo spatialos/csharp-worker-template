@@ -14,7 +14,7 @@ namespace Improbable.CSharpCodeGen
         public static IEnumerable<string> GetAnnotationStrings(this IEnumerable<Annotation> annotations, string attributeName, int fieldNumber)
         {
             var annotation = annotations.FirstOrDefault(a => a.TypeValue.Type == attributeName);
-            if (!annotation.TypeValue.Fields.Any())
+            if (annotation.TypeValue.Fields.IsEmpty)
             {
                 return new string[]{};
             }
@@ -26,7 +26,7 @@ namespace Improbable.CSharpCodeGen
         public static string GetAnnotationString(this IEnumerable<Annotation> annotations, string attributeName, int fieldIndex)
         {
             var annotation = annotations.FirstOrDefault(a => a.TypeValue.Type == attributeName);
-            if (!annotation.TypeValue.Fields.Any())
+            if (annotation.TypeValue.Fields.IsEmpty)
             {
                 return "";
             }
