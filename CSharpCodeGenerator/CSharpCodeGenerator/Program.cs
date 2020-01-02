@@ -28,6 +28,13 @@ namespace CSharpCodeGenerator
         [Option("output-dir", Required = true,
             HelpText = "The path to write the generated code to.")]
         public string OutputDir { get; set; }
+
+        public Options()
+        {
+            InputBundle = "";
+            OutputMarker = "";
+            OutputDir = "";
+        }
     }
 
     internal class Program

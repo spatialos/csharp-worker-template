@@ -6,10 +6,10 @@ namespace Improbable.Stdlib
     public interface IWorkerOptions
     {
         [Option("worker-name", Required = false, HelpText = "The name of the worker connecting to SpatialOS.")]
-        string WorkerName { get; set; }
+        string? WorkerName { get; set; }
 
         [Option("logfile", Required = false, HelpText = "The full path to a logfile.")]
-        string LogFileName { get; set; }
+        string? LogFileName { get; set; }
 
         [Value(0)] IEnumerable<string> UnknownPositionalArguments { get; set; }
     }
@@ -34,7 +34,7 @@ namespace Improbable.Stdlib
         [Option("spatialos-use-insecure-connection")]
         bool UseInsecureConnection { get; set; }
 
-        [Option("dev-token", HelpText = "Your Development Auth Token. For more information: \n " +
+        [Option("dev-token", HelpText = "Your Development Auth Token. For more information: \n" +
                                                      "https://docs.improbable.io/reference/14.1/shared/auth/development-authentication#create-a-developmentauthenticationtoken")]
         string DevToken { get; set; }
 

@@ -26,7 +26,7 @@ namespace GameLogic
                 }
             };
 
-            IWorkerOptions options = null;
+            IWorkerOptions? options = null;
 
             Parser.Default.ParseArguments<ReceptionistOptions>(args)
                 .WithParsed(opts => options = opts);
