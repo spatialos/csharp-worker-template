@@ -10,11 +10,9 @@ namespace GameLogic
         public string? WorkerName { get; set; }
         public string? LogFileName { get; set; }
 
-#pragma warning disable 8618 // Non-nullable property '' is uninitialized.Consider declaring the property as nullable.
         [Value(0, Hidden = true)] // Stops "pos value 0" being shown when help is ran
-        public IEnumerable<string> UnknownPositionalArguments { get; set; }
-        public string SpatialOsHost { get; set; }
-#pragma warning restore 8618
+        public IEnumerable<string> UnknownPositionalArguments { get; set; } = null!;
+        public string SpatialOsHost { get; set; } = null!;
         public ushort SpatialOsPort { get; set; }
     }
 }

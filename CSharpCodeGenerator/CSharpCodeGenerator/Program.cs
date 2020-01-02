@@ -19,22 +19,15 @@ namespace CSharpCodeGenerator
     {
         [Option("input-bundle", Required = true,
             HelpText = "The path to the JSON Bundle file output by the SpatialOS schema_compiler.")]
-        public string InputBundle { get; set; }
+        public string InputBundle { get; set; } = null!;
 
         [Option("output-marker",
             HelpText = "The path to a file that is written when code is successfully generated. Useful for timestamp checking in build systems.")]
-        public string OutputMarker { get; set; }
+        public string OutputMarker { get; set; } = null!;
 
         [Option("output-dir", Required = true,
             HelpText = "The path to write the generated code to.")]
-        public string OutputDir { get; set; }
-
-        public Options()
-        {
-            InputBundle = "";
-            OutputMarker = "";
-            OutputDir = "";
-        }
+        public string OutputDir { get; set; } = null!;
     }
 
     internal class Program
