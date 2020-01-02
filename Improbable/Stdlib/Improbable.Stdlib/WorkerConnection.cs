@@ -19,7 +19,7 @@ namespace Improbable.Stdlib
         private readonly ConcurrentDictionary<long, TaskHandler> requestsToComplete = new ConcurrentDictionary<long, TaskHandler>();
         private readonly Connection connection;
         private Task? metricsTask;
-        private CancellationTokenSource? metricsTcs;
+        private CancellationTokenSource? metricsCts;
         private string? workerId;
         private readonly object connectionLock = new object();
 
@@ -128,7 +128,7 @@ namespace Improbable.Stdlib
                 throw new InvalidOperationException("Metrics are already being sent");
             }
 
-            metricsTcs = new CancellationTokenSource();
+            metricsCts = new CancellationTokenSource();
 
             metricsTask = Task.Factory.StartNew(async unused =>
             {
@@ -136,14 +136,14 @@ namespace Improbable.Stdlib
 
                 while (true)
                 {
-                    metricsTcs.Token.ThrowIfCancellationRequested();
+                    metricsCts.Token.ThrowIfCancellationRequested();
 
                     foreach (var updater in updaterList)
                     {
                         updater.Invoke(metrics);
                     }
 
-                    metrics.Load = await GetCpuUsageForProcess(metricsTcs.Token) / 100.0;
+                    metrics.Load = await GetCpuUsageForProcess(metricsCts.Token) / 100.0;
 
                     lock (connectionLock)
                     {
@@ -155,14 +155,14 @@ namespace Improbable.Stdlib
                         connection.SendMetrics(metrics);
                     }
 
-                    await Task.Delay(TimeSpan.FromSeconds(5), metricsTcs.Token);
+                    await Task.Delay(TimeSpan.FromSeconds(5), metricsCts.Token);
                 }
-            }, metricsTcs.Token);
+            }, metricsCts.Token);
         }
 
         public void StopSendingMetrics()
         {
-            metricsTcs?.Cancel();
+            metricsCts?.Cancel();
             try
             {
                 metricsTask?.Wait();
@@ -172,8 +172,8 @@ namespace Improbable.Stdlib
                 // Do nothing
             }
 
-            metricsTcs?.Dispose();
-            metricsTcs = null;
+            metricsCts?.Dispose();
+            metricsCts = null;
 
             metricsTask = null;
         }
