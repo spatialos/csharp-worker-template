@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Immutable;
 using System.Diagnostics;
+using System.Runtime.Serialization;
 
 namespace Improbable.Schema.Bundle
 {
@@ -90,6 +91,12 @@ namespace Improbable.Schema.Bundle
         public struct ListValueHolder
         {
             public ImmutableList<Value> Values;
+
+            [OnSerialized]
+            private void OnSerialized(StreamingContext context)
+            {
+                Values ??= ImmutableList<Value>.Empty;
+            }
         }
 
         public struct MapValueHolder
@@ -118,6 +125,13 @@ namespace Improbable.Schema.Bundle
         public ImmutableList<FieldValue> Fields;
 
         public string Type;
+
+        [OnSerialized]
+        private void OnSerialized(StreamingContext context)
+        {
+            Fields ??= ImmutableList<FieldValue>.Empty;
+            Type ??= "";
+        }
 
         public struct FieldValue
         {
