@@ -33,10 +33,11 @@ namespace Improbable.Stdlib.CSharpCodeGen
 {{
     public static class WorkerTypes
     {{
-        public static string[] AllWorkerTypes = {{ {string.Join(", ", workerTypes.Select(workerType => $"WorkerTypes.{SnakeCaseToPascalCase(workerType)}"))} }};
+{Indent(2, string.Join("\n", workerTypes.Select(workerType => $@"public static string {SnakeCaseToPascalCase(workerType)} = ""{workerType}"";")))}
+
+        public static string[] AllWorkerTypes = {{ {string.Join(", ", workerTypes.Select(workerType => $"{SnakeCaseToPascalCase(workerType)}"))} }};
         public static string[] AllWorkerLayers = {{ {string.Join(", ", layers.Select(layer => $"Layers.{SnakeCaseToPascalCase(layer)}"))} }};
 
-{Indent(2, string.Join("\n", workerTypes.Select(workerType => $@"public static string {SnakeCaseToPascalCase(workerType)} = ""{workerType}"";")))}
     }}
 
     public static class Layers
