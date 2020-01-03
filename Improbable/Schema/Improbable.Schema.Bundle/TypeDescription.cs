@@ -26,6 +26,8 @@ namespace Improbable.Schema.Bundle
 
         public readonly IReadOnlyList<ComponentDefinition.EventDefinition> Events;
 
+        public readonly IReadOnlyList<string> Warnings;
+
         public readonly uint? ComponentId;
 
         /// <summary>
@@ -89,13 +91,16 @@ namespace Improbable.Schema.Bundle
                 throw new Exception("Internal error: no fields found");
             }
 
+            var warnings = new List<string>();
+            Warnings = warnings;
+
             Fields = Fields.Where(f =>
             {
                 var allowed = !IsPrimitiveEntityField(f);
 
                 if (!allowed)
                 {
-                    Console.WriteLine($"field '{qualifiedName}.{f.Name}' is the Entity type, which is currently unsupported.");
+                    warnings.Add($"field '{qualifiedName}.{f.Name}' is the Entity type, which is currently unsupported.");
                 }
 
                 return allowed;

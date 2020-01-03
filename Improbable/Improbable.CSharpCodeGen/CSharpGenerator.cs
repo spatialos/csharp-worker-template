@@ -10,8 +10,11 @@ namespace Improbable.CSharpCodeGen
 {
     public class Generator : ICodeGenerator
     {
+        private readonly Bundle bundle;
+
         public Generator(Bundle bundle)
         {
+            this.bundle = bundle;
             FieldDecorators = new List<Func<FieldDefinition, string>>();
         }
 
@@ -26,15 +29,22 @@ namespace Improbable.CSharpCodeGen
                 sb.AppendLine($"public const uint ComponentId = {type.ComponentId.Value};");
             }
 
-            sb.AppendLine(GenerateFields(type, type.Fields));
-
-            // For types with a single field of map or list type, provide a params-style constructor for nicer ergonomics.
-            if (type.Fields.Count == 1 && (type.Fields[0].TypeSelector == FieldType.List || type.Fields[0].TypeSelector == FieldType.Map))
+            foreach (var field in type.Fields.Where(f => IsFieldTypeRecursive(bundle, type.QualifiedName, f)))
             {
-                sb.AppendLine(GenerateParamsConstructor(type, type.Fields));
+                sb.AppendLine($"// Recursive field {SnakeCaseToPascalCase(field.Name)} omitted.");
+                sb.AppendLine($"// public readonly {GetFieldTypeAsCsharp(type, field)} {SnakeCaseToPascalCase(field.Name)};");
             }
 
-            sb.AppendLine(GenerateEquatable(type, type.Fields));
+            var filteredFields = type.Fields.Where(f => !IsFieldTypeRecursive(bundle, type.QualifiedName, f)).ToList();
+            sb.AppendLine(GenerateFields(type, filteredFields));
+
+            // For types with a single field of map or list type, provide a params-style constructor for nicer ergonomics.
+            if (filteredFields.Count == 1 && (filteredFields[0].TypeSelector == FieldType.List || filteredFields[0].TypeSelector == FieldType.Map))
+            {
+                sb.AppendLine(GenerateParamsConstructor(type, filteredFields));
+            }
+
+            sb.AppendLine(GenerateEquatable(type, filteredFields));
 
             return sb.ToString();
         }

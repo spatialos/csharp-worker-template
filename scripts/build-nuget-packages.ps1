@@ -20,3 +20,5 @@ if (!$?) {
 if (!$?) {
     exit 1
 }
+
+[System.Media.SystemSounds]::Beep.Play()

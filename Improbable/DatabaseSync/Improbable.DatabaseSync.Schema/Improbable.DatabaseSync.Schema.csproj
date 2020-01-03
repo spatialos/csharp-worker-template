@@ -1,16 +1,14 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>netstandard2.0</TargetFramework>
-
     <IncludeBuildOutput>false</IncludeBuildOutput>
-    <Version>0.0.2-preview</Version>
+    <Version>0.0.3-preview</Version>
     <Description>SpatialOS DatabaseSync Schema</Description>
   </PropertyGroup>
 
   <ItemGroup>
     <!-- This item needs to be in specific folders, rather than nested under the 'content' directory. -->
-    <Content Include="build\netstandard2.0\Improbable.DatabaseSync.Schema.targets" PackagePath="%(Identity)" />
+    <Content Include="build\netstandard2.1\Improbable.DatabaseSync.Schema.targets" PackagePath="%(Identity)" />
     <Content Include="schema\improbable\database_sync\database_sync.schema" />
   </ItemGroup>
 

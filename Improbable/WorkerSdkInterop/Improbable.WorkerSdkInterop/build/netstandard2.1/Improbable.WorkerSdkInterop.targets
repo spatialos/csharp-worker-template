@@ -31,7 +31,7 @@
 
   <ItemGroup>
     <Reference Include="Improbable.Worker.CInterop">
-      <HintPath>lib\netstandard2.0\Improbable.Worker.CInterop.dll</HintPath>
+      <HintPath>lib\netstandard2.1\Improbable.Worker.CInterop.dll</HintPath>
     </Reference>
   </ItemGroup>
 </Project>

@@ -1,24 +1,22 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>netstandard2.0</TargetFramework>
     <Platforms>x64</Platforms>
-    <LangVersion>8.0</LangVersion>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <Version>0.0.3-preview</Version>
+    <Version>0.0.4-preview</Version>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="CommandLineParser" Version="2.6.0" />
+    <PackageReference Include="CommandLineParser" Version="2.7.82" />
     <PackageReference Include="Improbable.SpatialOS.Platform" Version="14.1.0" />
     <PackageReference Include="Improbable.WorkerSdkInterop" Version="14.1.0" />
-    <PackageReference Include="Newtonsoft.Json" Version="12.0.2" />
-    <PackageReference Include="System.Collections.Immutable" Version="1.6.0" />
+    <PackageReference Include="Newtonsoft.Json" Version="12.0.3" />
+    <PackageReference Include="System.Collections.Immutable" Version="1.7.0" />
   </ItemGroup>
 
   <ItemGroup>
     <!-- This item needs to be in specific folders, rather than nested under the 'content' directory. -->
-    <Content Include="build\netstandard2.0\Improbable.Stdlib.targets" PackagePath="%(Identity)" />
+    <Content Include="build\netstandard2.1\Improbable.Stdlib.targets" PackagePath="%(Identity)" />
   </ItemGroup>
 
   <ItemGroup>
