@@ -25,6 +25,8 @@ namespace Improbable.Stdlib
         private readonly BlockingCollection<OpList> ops = new BlockingCollection<OpList>();
         private Task processOpsTask;
 
+        public string WorkerId { get; }
+
         private WorkerConnection(Connection connection)
         {
             this.connection = connection ?? throw new ArgumentNullException(nameof(connection));
@@ -70,8 +72,6 @@ namespace Improbable.Stdlib
                 }
             }, TaskCreationOptions.LongRunning);
         }
-
-        public string WorkerId { get; }
 
         public void Dispose()
         {
@@ -620,7 +620,7 @@ namespace Improbable.Stdlib
         {
             var startTime = DateTime.UtcNow;
             var startCpuUsage = Process.GetCurrentProcess().TotalProcessorTime;
-            await Task.Delay(500, cancellationToken).ConfigureAwait(false);
+            await Task.Delay(TimeSpan.FromSeconds(0.5), cancellationToken).ConfigureAwait(false);
 
             var endTime = DateTime.UtcNow;
             var endCpuUsage = Process.GetCurrentProcess().TotalProcessorTime;
