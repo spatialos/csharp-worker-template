@@ -102,7 +102,7 @@ namespace Improbable.Stdlib
             return GetEnumerator();
         }
 
-        [DebuggerDisplay("{"+ nameof(Worker.CInterop.OpType) + "}")]
+        [DebuggerDisplay("{" + nameof(OpType) + "}")]
         public struct Op
         {
             public OpType OpType;
