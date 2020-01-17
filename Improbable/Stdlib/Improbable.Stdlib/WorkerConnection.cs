@@ -115,14 +115,13 @@ namespace Improbable.Stdlib
 
         public static async Task<WorkerConnection> ConnectAsync(string host, ushort port, string workerName, ConnectionParameters connectionParameters, CancellationToken cancellation = default)
         {
-            using (var future = Connection.ConnectAsync(host, port, workerName, connectionParameters))
-            {
-                var connection = await future.ToTask(cancellation).ConfigureAwait(false);
+            using var future = Connection.ConnectAsync(host, port, workerName, connectionParameters);
+            var connection = await future.ToTask(cancellation).ConfigureAwait(false);
 
-                if (connection.GetConnectionStatusCode() != ConnectionStatusCode.Success)
-                {
-                    throw new Exception($"{connection.GetConnectionStatusCode()}: {connection.GetConnectionStatusCodeDetailString()}");
-                }
+            if (connection.GetConnectionStatusCode() != ConnectionStatusCode.Success)
+            {
+                throw new Exception($"{connection.GetConnectionStatusCode()}: {connection.GetConnectionStatusCodeDetailString()}");
+            }
 
             if (connection.GetConnectionStatusCode() != ConnectionStatusCode.Success)
             {
@@ -152,15 +151,14 @@ namespace Improbable.Stdlib
                 ProjectName = options.ProjectName
             };
 
-            using (var locator = new Locator(options.SpatialOsHost, options.SpatialOsPort, locatorParameters))
-            using (var future = locator.ConnectAsync(connectionParameters))
-            {
-                var connection = await future.ToTask(cancellation).ConfigureAwait(false);
+            using var locator = new Locator(options.SpatialOsHost, options.SpatialOsPort, locatorParameters);
+            using var future = locator.ConnectAsync(connectionParameters);
+            var connection = await future.ToTask(cancellation).ConfigureAwait(false);
 
-                if (connection != null && connection.GetConnectionStatusCode() != ConnectionStatusCode.Success)
-                {
-                    throw new Exception($"{connection.GetConnectionStatusCode()}: {connection.GetConnectionStatusCodeDetailString()}");
-                }
+            if (connection != null && connection.GetConnectionStatusCode() != ConnectionStatusCode.Success)
+            {
+                throw new Exception($"{connection.GetConnectionStatusCode()}: {connection.GetConnectionStatusCodeDetailString()}");
+            }
 
             if (connection != null && connection.GetConnectionStatusCode() != ConnectionStatusCode.Success)
             {
