@@ -19,31 +19,73 @@ namespace Improbable.Stdlib
         private readonly ConcurrentDictionary<long, TaskHandler> requestsToComplete = new ConcurrentDictionary<long, TaskHandler>();
         private Connection connection;
         private Task metricsTask;
-        private CancellationTokenSource metricsTcs = new CancellationTokenSource();
-        private string workerId;
+        private CancellationTokenSource metricsCts = new CancellationTokenSource();
         private readonly object connectionLock = new object();
+        private readonly CancellationTokenSource processOpsCts = new CancellationTokenSource();
+        private readonly BlockingCollection<OpList> ops = new BlockingCollection<OpList>();
+        private Task processOpsTask;
 
         private WorkerConnection(Connection connection)
         {
             this.connection = connection ?? throw new ArgumentNullException(nameof(connection));
+            WorkerId = connection.GetWorkerId();
+
+            StartBackgroundOpsGathering();
         }
 
-        public string WorkerId
+        private void StartBackgroundOpsGathering()
         {
-            get
+            processOpsTask = Task.Factory.StartNew(() =>
             {
-                if (string.IsNullOrEmpty(workerId))
+                // We have to resort to polling here since connection.GetOpList doesn't provide a means of cancellation
+                try
                 {
-                    // ReSharper disable once InconsistentlySynchronizedField
-                    workerId = connection.GetWorkerId();
-                }
+                    while (!processOpsCts.Token.IsCancellationRequested)
+                    {
+                        if (GetConnectionStatusCode() != ConnectionStatusCode.Success)
+                        {
+                            break;
+                        }
 
-                return workerId;
-            }
+                        OpList opList;
+                        lock (connectionLock)
+                        {
+                            var rawOps = connection.GetOpList(1);
+                            if (rawOps.GetOpCount() == 0)
+                            {
+                                continue;
+                            }
+
+                            opList = new OpList(rawOps);
+                        }
+
+                        // NB: finish processing the OpList before adding it to the queue, since it will be Disposed on whatever thread is enumerating the ops collection.
+                        CompleteCommands(opList);
+                        ops.Add(opList);
+                    }
+                }
+                finally
+                {
+                    ops.CompleteAdding();
+                }
+            }, TaskCreationOptions.LongRunning);
         }
+
+        public string WorkerId { get; }
 
         public void Dispose()
         {
+            processOpsCts.Cancel();
+            processOpsTask.Wait();
+
+            // Cleanup pending ops
+            while (ops.TryTake(out var op))
+            {
+                op.Dispose();
+            }
+
+            ops.Dispose();
+
             lock (connectionLock)
             {
                 StopSendingMetrics();
@@ -52,7 +94,6 @@ namespace Improbable.Stdlib
                 connection?.Dispose();
                 connection = null;
             }
-
         }
 
         public static Task<WorkerConnection> ConnectAsync(IWorkerOptions workerOptions, ConnectionParameters connectionParameters, CancellationToken cancellation = default)
@@ -76,7 +117,7 @@ namespace Improbable.Stdlib
         {
             using (var future = Connection.ConnectAsync(host, port, workerName, connectionParameters))
             {
-                var connection = await future.ToTask(cancellation);
+                var connection = await future.ToTask(cancellation).ConfigureAwait(false);
 
                 if (connection.GetConnectionStatusCode() != ConnectionStatusCode.Success)
                 {
@@ -110,7 +151,7 @@ namespace Improbable.Stdlib
             using (var locator = new Locator(options.SpatialOsHost, options.SpatialOsPort, locatorParameters))
             using (var future = locator.ConnectAsync(connectionParameters))
             {
-                var connection = await future.ToTask(cancellation);
+                var connection = await future.ToTask(cancellation).ConfigureAwait(false);
 
                 if (connection != null && connection.GetConnectionStatusCode() != ConnectionStatusCode.Success)
                 {
@@ -132,16 +173,14 @@ namespace Improbable.Stdlib
             {
                 var metrics = new Metrics();
 
-                while (true)
+                while (!metricsCts.IsCancellationRequested)
                 {
-                    metricsTcs.Token.ThrowIfCancellationRequested();
-
                     foreach (var updater in updaterList)
                     {
                         updater.Invoke(metrics);
                     }
 
-                    metrics.Load = await GetCpuUsageForProcess(metricsTcs.Token) / 100.0;
+                    metrics.Load = await GetCpuUsageForProcess(metricsCts.Token).ConfigureAwait(false) / 100.0;
 
                     lock (connectionLock)
                     {
@@ -153,27 +192,18 @@ namespace Improbable.Stdlib
                         connection.SendMetrics(metrics);
                     }
 
-                    await Task.Delay(TimeSpan.FromSeconds(5), metricsTcs.Token);
+                    await Task.Delay(TimeSpan.FromSeconds(5), metricsCts.Token).ConfigureAwait(false);
                 }
-            }, metricsTcs.Token);
+            }, metricsCts.Token, TaskCreationOptions.LongRunning);
         }
 
         public void StopSendingMetrics()
         {
-            metricsTcs?.Cancel();
-            try
-            {
-                metricsTask?.Wait();
-            }
-            catch
-            {
-                // Do nothing
-            }
-
-            metricsTcs?.Dispose();
+            metricsCts?.Cancel();
+            metricsCts?.Dispose();
 
             metricsTask = null;
-            metricsTcs = null;
+            metricsCts = null;
         }
 
         private static string GetDevelopmentPlayerIdentityToken(string host, ushort port, bool useInsecureConnection, string authToken, string playerId, string displayName)
@@ -235,7 +265,7 @@ namespace Improbable.Stdlib
             }
         }
 
-        public void ProcessOpList(OpList opList)
+        private void CompleteCommands(OpList opList)
         {
             foreach (var op in opList.Ops)
             {
@@ -340,7 +370,14 @@ namespace Improbable.Stdlib
 
             void Complete(CommandResponses r)
             {
-                completion.TrySetResult(getResult(r));
+                try
+                {
+                    completion.TrySetResult(getResult(r));
+                }
+                catch (Exception e)
+                {
+                    completion.TrySetException(new CommandFailedException(StatusCode.ApplicationError, e.Message));
+                }
             }
 
             void Fail(StatusCode code, string message)
@@ -488,65 +525,48 @@ namespace Improbable.Stdlib
         }
 
         /// <summary>
-        ///     Returns an OpList
+        ///     Returns an <see cref="OpList"/> if available, or an empty <see cref="OpList"/> if not.
         /// </summary>
-        /// <param name="timeout">
-        ///     An empty OpList will be returned after the specified duration. Use <see cref="TimeSpan.Zero" />
-        ///     to block.
-        /// </param>
-        public OpList GetOpList(TimeSpan timeout)
+        public OpList GetOpList(TimeSpan timeout, CancellationToken cancellation = default)
         {
-            lock (connectionLock)
-            {
-                ThrowIfNotConnected();
+            var combined = CancellationTokenSource.CreateLinkedTokenSource(cancellation, processOpsCts.Token);
 
-                return new OpList(connection.GetOpList((uint) timeout.TotalMilliseconds));
+            if (ops.TryTake(out var opList, timeout.Milliseconds, combined.Token))
+            {
+                return opList;
             }
+
+            return OpList.Empty;
         }
 
         /// <summary>
         ///     Returns OpLists for as long as connected to SpatialOS.
         /// </summary>
-        /// <param name="timeout">
-        ///     An empty OpList will be returned after the specified duration. Use <see cref="TimeSpan.Zero" />
-        ///     to block until new ops are available.
-        /// </param>
         /// <param name="cancellation">Cancellation token.</param>
-        public IEnumerable<OpList> GetOpLists(TimeSpan timeout, CancellationToken cancellation = default)
+        public IEnumerable<OpList> GetOpLists(CancellationToken cancellation = default)
         {
-            while (true)
-            {
-                cancellation.ThrowIfCancellationRequested();
+            var combined = CancellationTokenSource.CreateLinkedTokenSource(cancellation, processOpsCts.Token);
 
-                if (GetConnectionStatusCode() != ConnectionStatusCode.Success)
+            foreach (var opList in ops.GetConsumingEnumerable(combined.Token))
+            {
+                if (cancellation.IsCancellationRequested)
                 {
                     yield break;
                 }
 
-                OpList opList = null;
+                if (GetConnectionStatusCode() != ConnectionStatusCode.Success)
+                {
+                    CancelCommands();
+                    yield break;
+                }
 
                 try
                 {
-                    lock (connectionLock)
-                    {
-                        if (connection == null)
-                        {
-                            yield break;
-                        }
-
-                        opList = new OpList(connection.GetOpList((uint) timeout.TotalMilliseconds));
-                    }
-
                     yield return opList;
                 }
                 finally
                 {
                     opList?.Dispose();
-
-                    if (GetConnectionStatusCode() != ConnectionStatusCode.Success)
-                    {
-                        CancelCommands();
-                    }
                 }
             }
         }
@@ -600,7 +620,7 @@ namespace Improbable.Stdlib
         {
             var startTime = DateTime.UtcNow;
             var startCpuUsage = Process.GetCurrentProcess().TotalProcessorTime;
-            await Task.Delay(500, cancellationToken);
+            await Task.Delay(500, cancellationToken).ConfigureAwait(false);
 
             var endTime = DateTime.UtcNow;
             var endCpuUsage = Process.GetCurrentProcess().TotalProcessorTime;
