@@ -42,8 +42,7 @@ namespace Improbable.Stdlib.CSharpCodeGen
 
         private static string GenerateComponentCollection(TypeDescription type)
         {
-            var name = CapitalizeNamespace(type.QualifiedName);
-            var collectionType = $"global::Improbable.Stdlib.ComponentCollection<global::{name}>";
+            var collectionType = $"global::Improbable.Stdlib.ComponentCollection<{type.Fqn()}>";
 
             return $@"public static {collectionType} CreateComponentCollection()
 {{
@@ -62,14 +61,12 @@ namespace Improbable.Stdlib.CSharpCodeGen
             foreach (var evt in type.Events)
             {
                 var name = SnakeCaseToPascalCase(evt.Name);
-                var eventType = CapitalizeNamespace(evt.Type);
-                var events = $"global::Improbable.Stdlib.EventProcessor<global::{eventType}>";
+                var events = $"global::Improbable.Stdlib.EventProcessor<{evt.Fqn()}>";
 
                 sb.AppendLine($@"public static {events} Create{name}EventProcessor()
 {{
     return new {events}(ComponentId, TryGetEvents);
 }}");
-
             }
 
             return sb.ToString();
@@ -77,16 +74,14 @@ namespace Improbable.Stdlib.CSharpCodeGen
 
         private static string GenerateCommands(TypeDescription type, IEnumerable<ComponentDefinition.CommandDefinition> commands)
         {
-            var componentName = CapitalizeNamespace(type.QualifiedName);
             var text = new StringBuilder();
             var bindingMethods = new StringBuilder();
 
             var commandIndices = new StringBuilder();
             foreach (var cmd in commands)
             {
-                var response = CapitalizeNamespace(cmd.ResponseType);
-                var request = CapitalizeNamespace(cmd.RequestType);
-                var cmdName = SnakeCaseToPascalCase(cmd.Name);
+                var (request, response) = cmd.InnerFqns();
+                var cmdName = cmd.Name();
 
                 commandIndices.AppendLine($"{cmdName} = {cmd.CommandIndex},");
 
@@ -97,7 +92,7 @@ namespace Improbable.Stdlib.CSharpCodeGen
                 {
                     boundResponseSender = $@"public void Send{cmdName}Response(long id, {response} response)
 {{
-    global::{CapitalizeNamespace(type.QualifiedName)}.Send{cmdName}Response(connection, id, response);
+    {type.Fqn()}.Send{cmdName}Response(connection, id, response);
 }}";
                 }
 
@@ -115,7 +110,7 @@ namespace Improbable.Stdlib.CSharpCodeGen
 /// <returns> A Task containing response payload. </returns>
 public global::System.Threading.Tasks.Task<{response}> Send{cmdName}Async({request} request, {CancellationTokenType} cancellation = default, uint? timeout = null, global::Improbable.Worker.CInterop.CommandParameters? commandParameters = null)
 {{
-    return global::{CapitalizeNamespace(type.QualifiedName)}.Send{cmdName}Async(connection, entityId, request, cancellation, timeout, commandParameters);
+    return {type.Fqn()}.Send{cmdName}Async(connection, entityId, request, cancellation, timeout, commandParameters);
 }}
 {boundResponseSender}");
                 var responseSender = "";
@@ -128,7 +123,7 @@ public global::System.Threading.Tasks.Task<{response}> Send{cmdName}Async({reque
     var schemaResponse = global::Improbable.Worker.CInterop.SchemaCommandResponse.Create();
     response.ApplyToSchemaObject(schemaResponse.GetObject());
 
-    connection.SendCommandResponse(id, {componentName}.ComponentId, {cmd.CommandIndex}, schemaResponse);
+    connection.SendCommandResponse(id, {type.Fqn()}.ComponentId, {cmd.CommandIndex}, schemaResponse);
 }}
 ";
                 }
@@ -176,7 +171,7 @@ public static global::System.Threading.Tasks.Task<{response}> Send{cmdName}Async
         completion.TrySetException(new global::Improbable.Stdlib.CommandFailedException(code, message));
     }}
 
-    connection.Send(entityId, {componentName}.ComponentId, {cmd.CommandIndex}, schemaRequest, timeout, commandParameters, Complete, Fail);
+    connection.Send(entityId, {type.Fqn()}.ComponentId, {cmd.CommandIndex}, schemaRequest, timeout, commandParameters, Complete, Fail);
 
     return completion.Task;
 }}");
@@ -225,12 +220,7 @@ public static CommandSenderBinding Bind({WorkerConnectionType} connection, {Type
 
         public static string GenerateSendUpdate(TypeDescription type)
         {
-            var typeName = GetPascalCaseNameFromTypeName(type.QualifiedName);
-            var typeNamespace = GetPascalCaseNamespaceFromTypeName(type.QualifiedName);
-
-            var update = $"global::{typeNamespace}.{typeName}.Update";
-
-            return $@"public static void SendUpdate({WorkerConnectionType} connection, {Types.EntityIdType} entityId, {update} update, global::Improbable.Worker.CInterop.UpdateParameters? updateParams = null)
+            return $@"public static void SendUpdate({WorkerConnectionType} connection, {Types.EntityIdType} entityId, {$"{type.Fqn()}.Update"} update, global::Improbable.Worker.CInterop.UpdateParameters? updateParams = null)
 {{
     connection.SendComponentUpdate(entityId.Value, ComponentId, update.ToSchemaUpdate(), updateParams);
 }}

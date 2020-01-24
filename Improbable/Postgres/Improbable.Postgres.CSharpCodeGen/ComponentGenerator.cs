@@ -6,6 +6,7 @@ using Improbable.CSharpCodeGen;
 using Improbable.Schema.Bundle;
 using static Improbable.CSharpCodeGen.Types;
 using static Improbable.CSharpCodeGen.Case;
+using FieldType = Improbable.Schema.Bundle.FieldType;
 
 namespace Improbable.Postgres.CSharpCodeGen
 {
@@ -36,7 +37,7 @@ namespace Improbable.Postgres.CSharpCodeGen
 
             var indexFields = type.Fields.WithAnnotation(WellKnownAnnotations.IndexAttribute);
 
-            var typeName = $"global::{CapitalizeNamespace(type.QualifiedName)}";
+            var typeName = $"{type.Fqn()}";
 
             return $@"public static string CreateTypeTable(string tableName)
 {{
@@ -59,9 +60,9 @@ public const string SelectClause = ""{selectClause}"";
 
 public struct DatabaseChangeNotification
 {{
-    public {CapitalizeNamespace(type.QualifiedName)}? Old {{ get; set; }}
+    public {type.Fqn()}? Old {{ get; set; }}
 
-    public {CapitalizeNamespace(type.QualifiedName)} New {{ get; set; }}
+    public {type.Fqn()} New {{ get; set; }}
 }}
 
 public static string InitializeDatabase(string tableName)
@@ -97,10 +98,10 @@ CREATE TRIGGER notify_{{tableName}}_tgr
             var sb = new StringBuilder();
             foreach (var field in fields)
             {
-                var ordinal = $"{SnakeCaseToPascalCase(field.Name)}Ordinal";
+                var ordinal = $"{field.PascalCase()}Ordinal";
                 var toAdd = field.TypeSelector switch
                 {
-                    FieldType.Option => $"reader.IsDBNull({ordinal}) ? null : ({GetFieldTypeAsCsharp(type, field)}) reader.{Types.SchemaToReaderMethod[field.OptionType.InnerType.Primitive]}({ordinal}),",
+                    FieldType.Option => $"reader.IsDBNull({ordinal}) ? null : ({FqnFieldType(type, field)}) reader.{Types.SchemaToReaderMethod[field.OptionType.InnerType.Primitive]}({ordinal}),",
                     FieldType.Singular => $"reader.{Types.SchemaToReaderMethod[field.SingularType.Type.Primitive]}({ordinal}),",
                     _ => throw new ArgumentOutOfRangeException()
                 };

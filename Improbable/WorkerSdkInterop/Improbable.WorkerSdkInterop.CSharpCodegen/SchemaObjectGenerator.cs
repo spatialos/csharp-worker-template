@@ -6,6 +6,7 @@ using Improbable.CSharpCodeGen;
 using Improbable.Schema.Bundle;
 using static Improbable.CSharpCodeGen.Case;
 using static Improbable.CSharpCodeGen.Types;
+using FieldType = Improbable.Schema.Bundle.FieldType;
 using ValueType = Improbable.Schema.Bundle.ValueType;
 
 namespace Improbable.WorkerSdkInterop.CSharpCodeGen
@@ -21,7 +22,7 @@ namespace Improbable.WorkerSdkInterop.CSharpCodeGen
 
         public string Generate(TypeDescription type)
         {
-            var typeName = GetPascalCaseNameFromTypeName(type.QualifiedName);
+            var typeName = type.TypeName();
 
             var content = new StringBuilder();
             var commandTypes = bundle.CommandTypes;
@@ -29,7 +30,7 @@ namespace Improbable.WorkerSdkInterop.CSharpCodeGen
             content.AppendLine(GenerateSchemaConstructor(type, type.Fields).TrimEnd());
             content.AppendLine(GenerateApplyToSchemaObject(type.Fields).TrimEnd());
             content.AppendLine(GenerateUpdaters(type.Fields).TrimEnd());
-            content.AppendLine(GenerateConstructor(type, type.Fields));
+            content.AppendLine(GenerateConstructor(type, type.Fields).TrimEnd());
 
             if (type.ComponentId.HasValue)
             {
@@ -39,7 +40,7 @@ namespace Improbable.WorkerSdkInterop.CSharpCodeGen
                 if (!type.IsRestricted)
                 {
                     // Workers can't construct or send updates for restricted components.
-                    content.AppendLine(GenerateUpdateStruct(type, type.Fields));
+                    content.AppendLine(GenerateUpdateStruct(type, type.Fields).TrimEnd());
                 }
             }
 
@@ -56,16 +57,14 @@ namespace Improbable.WorkerSdkInterop.CSharpCodeGen
 
         private static string GenerateSchemaConstructor(TypeDescription type, IEnumerable<FieldDefinition> fields)
         {
-            var typeName = GetPascalCaseNameFromTypeName(type.QualifiedName);
+            var typeName = type.TypeName();
 
             var text = new StringBuilder();
             var sb = new StringBuilder();
 
             foreach (var field in fields)
             {
-                var fieldName = SnakeCaseToPascalCase(field.Name);
-
-                var output = GetAssignmentForField(type, field, fieldName);
+                var output = GetAssignmentForField(type, field, field.PascalCase());
                 sb.AppendLine(output);
             }
 
@@ -77,7 +76,6 @@ internal {typeName}(global::Improbable.Worker.CInterop.SchemaObject fields)
 
             return text.ToString();
         }
-
 
         private static string GetApplyMapObject(TypeReference type, string mapObjectFieldId)
         {
@@ -117,29 +115,22 @@ internal {typeName}(global::Improbable.Worker.CInterop.SchemaObject fields)
 
             foreach (var field in fields)
             {
-                var fieldName = SnakeCaseToPascalCase(field.Name);
-                var add = GetFieldAddMethod(field);
+                var fieldName = field.PascalCase();
 
                 var output = field.TypeSelector switch
                 {
-                    FieldType.Option => $"if ({fieldName}{GetOptionValueTestSuffix(field)}) {{ {GetApplyToSchemaObjectValueStatement(field, fieldName)} }}",
+                    FieldType.Option => $"if ({fieldName}{field.OptionValueTest()}) {{ {GetApplyToSchemaObjectValueStatement(field, fieldName)} }}",
 
-                    FieldType.List => $@"if ({fieldName} != null)
+                    FieldType.List => $@"foreach(var value in {fieldName})
 {{
-    foreach(var value in {fieldName})
-    {{
         {GetApplyToSchemaObjectValueStatement(field, "value")}
-    }}
 }}",
 
-                    FieldType.Map => $@"if ({fieldName} != null)
+                    FieldType.Map => $@"foreach(var kv in {fieldName})
 {{
-    foreach(var kv in {fieldName})
-    {{
         var kvPair = fields.AddObject({field.FieldId});
         {GetApplyMapObject(field.MapType.KeyType, SchemaMapKeyFieldId)}
         {GetApplyMapObject(field.MapType.ValueType, SchemaMapValueFieldId)}
-    }}
 }}",
                     FieldType.Singular => $"{GetApplyToSchemaObjectValueStatement(field, fieldName)}",
                     _ => throw new ArgumentOutOfRangeException()
@@ -155,17 +146,6 @@ internal void ApplyToSchemaObject(global::Improbable.Worker.CInterop.SchemaObjec
 }}";
         }
 
-        private static string GetOptionAssignment(FieldDefinition field, string fieldName, string output)
-        {
-            return $@"if (fields.GetObjectCount({field.FieldId}) > 0)
-{{
-{Indent(1, output)}
-}}
-else
-{{
-    {fieldName} = null;
-}}";
-        }
 
         private static string GetMapObjectAssignment(TypeReference type, string fieldId)
         {
@@ -174,11 +154,11 @@ else
             return type.ValueTypeSelector switch
             {
                 // (EnumType) (value)
-                ValueType.Enum => $"({TypeReferenceToType(type)}) {pairValue}",
+                ValueType.Enum => $"({type.Fqn()}) {pairValue}",
                 // value
                 ValueType.Primitive => pairValue,
                 // new Type(value)
-                ValueType.Type => $"new {TypeReferenceToType(type)}({pairValue})",
+                ValueType.Type => $"new {type.Fqn()}({pairValue})",
                 _ => throw new ArgumentOutOfRangeException()
             };
         }
@@ -189,7 +169,7 @@ else
             var suffix = "";
             var indexer = "";
 
-            var containedType = GetInnerTypeAsCsharp(field);
+            var containedType = field.InnerFqn();
             var fieldAccessor = field.IsList() ? GetFieldIndexMethod(field) : GetFieldGetMethod(field);
 
             if (field.HasEnum())
@@ -243,7 +223,8 @@ else
 
                 FieldType.List => $@"{{
     var count = fields.{fieldCount}({field.FieldId});
-    {fieldName} = {GetEmptyCollection(type, field)};
+    var local = {GetEmptyCollection(type, field)};
+    {fieldName} = local;
 
     for (uint i = 0; i < count; i++)
     {{
@@ -253,7 +234,8 @@ else
 
                 FieldType.Map => $@"{{
     var count = fields.{fieldCount}({field.FieldId});
-    {fieldName} = {GetEmptyCollection(type, field)};
+        var local = {GetEmptyCollection(type, field)};
+    {fieldName} = local;
 
     for(uint i = 0; i < fields.{fieldCount}({field.FieldId}); i++)
     {{
@@ -269,29 +251,29 @@ else
 
         private static string GenerateFromUpdate(TypeDescription type)
         {
-            var typeName = GetPascalCaseNameFromTypeName(type.QualifiedName);
+            var typeName = type.TypeName();
 
             var text = new StringBuilder();
             var sb = new StringBuilder();
             foreach (var field in type.Fields)
             {
-                var fieldName = $"{SnakeCaseToPascalCase(field.Name)}";
-                var fieldCount = GetFieldCountMethod(field);
+                var fieldName = field.PascalCase();
+                var getCount = GetFieldCountMethod(field);
 
-                var fieldUpdateExists = $"fields.{fieldCount}({field.FieldId}) > 0";
+                var fieldUpdateExists = $"fields.{getCount}({field.FieldId}) > 0";
 
-                var output = GetAssignmentForField(type, field, fieldName);
+                var assignment = GetAssignmentForField(type, field, fieldName);
 
                 var guard = field.TypeSelector switch
                 {
                     FieldType.Singular => $@"if ({fieldUpdateExists})
 {{
-{Indent(1, output)}
+{Indent(1, assignment)}
 }}",
                     // option, list, map
                     _ => $@"if ({fieldUpdateExists})
 {{
-{Indent(1, output)}
+{Indent(1, assignment)}
 }}
 else if (FieldIsCleared({field.FieldId}, clearedFields))
 {{
@@ -302,7 +284,7 @@ else if (FieldIsCleared({field.FieldId}, clearedFields))
                 sb.AppendLine(guard);
             }
 
-            text.AppendLine($@"internal {typeName}({typeName} source, {SchemaComponentUpdate} update)
+            text.AppendLine($@"internal {typeName}(in {typeName} source, {SchemaComponentUpdate} update)
 {{
     var fields = update.GetFields();
     var clearedFields = update.GetClearedFields();
@@ -340,7 +322,7 @@ public static {typeName} CreateFromSnapshot(global::Improbable.Worker.CInterop.E
     return new {typeName}();
 }}
 
-internal static {typeName} ApplyUpdate({typeName} source, {SchemaComponentUpdate}? update)
+internal static {typeName} ApplyUpdate(in {typeName} source, {SchemaComponentUpdate}? update)
 {{
     return update.HasValue ? new {typeName}(source, update.Value) : source;
 }}
@@ -357,20 +339,8 @@ public global::Improbable.Worker.CInterop.ComponentData ToData()
         }
 
 
-        private static string GetOptionValueTestSuffix(FieldDefinition field)
-        {
-            if (!field.IsOption())
-            {
-                throw new InvalidOperationException("Must be called for an option<> field");
-            }
-
-            return field.CanPrimitiveBeNull() ? " != null" : ".HasValue";
-        }
-
-        private static string GetValueAccessor(FieldDefinition field, string variableName)
-        {
-
-            return field.TypeSelector switch
+        private static string GetValueAccessor(FieldDefinition field, string variableName) =>
+            field.TypeSelector switch
             {
                 FieldType.Option when field.HasEnum() => $"(uint) {variableName}.Value",
                 FieldType.Option when field.CanPrimitiveBeNull() => variableName,
@@ -388,7 +358,6 @@ public global::Improbable.Worker.CInterop.ComponentData ToData()
 
                 _ => throw new ArgumentOutOfRangeException()
             };
-        }
 
         private static string GetUpdateValueStatement(FieldDefinition field, string variableName)
         {
@@ -411,7 +380,7 @@ public global::Improbable.Worker.CInterop.ComponentData ToData()
                 var output = field.TypeSelector switch
                 {
                     // =======
-                    FieldType.Option => $@"if (newValue{GetOptionValueTestSuffix(field)})
+                    FieldType.Option => $@"if (newValue{field.OptionValueTest()})
 {{
     {GetUpdateValueStatement(field, "newValue")}
 }}
@@ -461,7 +430,7 @@ if (!any)
                 };
 
                 text.AppendLine($@"
-internal static void Update{SnakeCaseToPascalCase(field.Name)}({SchemaComponentUpdate} update, {GetParameterTypeAsCsharp(field)} newValue)
+internal static void Update{field.PascalCase()}({SchemaComponentUpdate} update, {field.ParameterType()} newValue)
 {{
     var fields = update.GetFields();
 {Indent(1, output.TrimEnd())}
@@ -482,8 +451,8 @@ internal static void Update{SnakeCaseToPascalCase(field.Name)}({SchemaComponentU
             var eventGetters = new StringBuilder();
             foreach (var evt in events)
             {
-                var eventPayloadType = CapitalizeNamespace(CapitalizeNamespace(evt.Type));
-                var identifierName = FieldNameToSafeName(SnakeCaseToCamelCase(evt.Name));
+                var eventPayloadType = evt.Fqn();
+                var identifierName = evt.CamelCase();
                 parameters.Append($",\n\t\tout global::System.Collections.Immutable.ImmutableArray<{eventPayloadType}> {identifierName}");
 
                 eventGetters.Append($@"{identifierName} = global::System.Collections.Immutable.ImmutableArray<{eventPayloadType}>.Empty;
@@ -500,7 +469,7 @@ public static bool TryGetEvents({SchemaComponentUpdate} update{parameters})
     var events = update.GetEvents();
 
 {Indent(1, eventGetters.ToString().TrimEnd())}
-    return {string.Join($"{Indent(2, "&& ")}\n", events.Select(evt => $"!{FieldNameToSafeName(SnakeCaseToCamelCase(evt.Name))}.IsDefaultOrEmpty"))};
+    return {string.Join($"{Indent(2, "&& ")}\n", events.Select(evt => $"!{evt.CamelCase()}.IsDefaultOrEmpty"))};
 }}";
         }
 
@@ -508,28 +477,27 @@ public static bool TryGetEvents({SchemaComponentUpdate} update{parameters})
         {
             var fieldText = new StringBuilder();
 
-            var typeName = GetPascalCaseNameFromTypeName(type.QualifiedName);
-            var typeNamespace = GetPascalCaseNamespaceFromTypeName(type.QualifiedName);
+            var typeName = type.Fqn();
 
             foreach (var field in fields)
             {
-                fieldText.AppendLine($"private {GetFieldTypeAsCsharp(type, field)} {FieldNameToSafeName(SnakeCaseToCamelCase(field.Name))};");
-                fieldText.AppendLine($"private bool was{SnakeCaseToPascalCase(field.Name)}Updated;");
+                fieldText.AppendLine($"private {FqnFieldType(type, field)} {field.CamelCase()};");
+                fieldText.AppendLine($"private bool was{field.PascalCase()}Updated;");
             }
 
             foreach (var ev in type.Events)
             {
-                fieldText.AppendLine($"private global::System.Collections.Generic.List<global::{CapitalizeNamespace(ev.Type)}> {SnakeCaseToCamelCase(ev.Name)}Events;");
+                fieldText.AppendLine($"private global::System.Collections.Generic.List<{ev.Fqn()}> {ev.CamelCase()}Events;");
             }
 
             var setMethodText = new StringBuilder();
 
             foreach (var field in fields)
             {
-                setMethodText.AppendLine($@"public Update Set{SnakeCaseToPascalCase(field.Name)}({GetParameterTypeAsCsharp(field)} {FieldNameToSafeName(SnakeCaseToCamelCase(field.Name))})
+                setMethodText.AppendLine($@"public Update Set{field.PascalCase()}({field.ParameterType()} {field.CamelCase()})
 {{
-    this.{FieldNameToSafeName(SnakeCaseToCamelCase(field.Name))} = {InitializeFromParameter(type, field)};
-    was{SnakeCaseToPascalCase(field.Name)}Updated = true;
+    this.{field.CamelCase()} = {InitializeFromParameter(type, field)};
+    was{field.PascalCase()}Updated = true;
     return this;
 }}
 ");
@@ -537,10 +505,10 @@ public static bool TryGetEvents({SchemaComponentUpdate} update{parameters})
 
             foreach (var ev in type.Events)
             {
-                setMethodText.AppendLine($@"public Update Add{SnakeCaseToPascalCase(ev.Name)}Event(global::{CapitalizeNamespace(ev.Type)} ev)
+                setMethodText.AppendLine($@"public Update Add{SnakeCaseToPascalCase(ev.Name)}Event({ev.Fqn()} ev)
 {{
-    this.{SnakeCaseToCamelCase(ev.Name)}Events = this.{SnakeCaseToCamelCase(ev.Name)}Events ?? new global::System.Collections.Generic.List<global::{CapitalizeNamespace(ev.Type)}>();
-    this.{SnakeCaseToCamelCase(ev.Name)}Events.Add(ev);
+    this.{ev.CamelCase()}Events = this.{ev.CamelCase()}Events ?? new global::System.Collections.Generic.List<{ev.Fqn()}>();
+    this.{ev.CamelCase()}Events.Add(ev);
     return this;
 }}
 ");
@@ -550,21 +518,21 @@ public static bool TryGetEvents({SchemaComponentUpdate} update{parameters})
 
             foreach (var field in fields)
             {
-                var name = SnakeCaseToPascalCase(field.Name);
+                var name = field.PascalCase();
                 toUpdateMethodBody.AppendLine($@"if (was{name}Updated)
 {{
-    global::{typeNamespace}.{typeName}.Update{name}(update, {FieldNameToSafeName(SnakeCaseToCamelCase(field.Name))});
+    {typeName}.Update{name}(update, {field.CamelCase()});
 }}
 ");
             }
 
             foreach (var ev in type.Events)
             {
-                toUpdateMethodBody.AppendLine($@"if (this.{SnakeCaseToCamelCase(ev.Name)}Events != null)
+                toUpdateMethodBody.AppendLine($@"if (this.{ev.CamelCase()}Events != null)
 {{
     var events = update.GetEvents();
 
-    foreach (var ev in this.{SnakeCaseToCamelCase(ev.Name)}Events)
+    foreach (var ev in this.{ev.CamelCase()}Events)
     {{
         ev.ApplyToSchemaObject(events.AddObject({ev.EventIndex}));
     }}
@@ -585,19 +553,18 @@ public static bool TryGetEvents({SchemaComponentUpdate} update{parameters})
 
         return update;
     }}
-}}
-";
+}}";
         }
 
         private static string GenerateConstructor(TypeDescription type, IReadOnlyCollection<FieldDefinition> fields)
         {
-            var typeName = GetPascalCaseNameFromTypeName(type.QualifiedName);
+            var typeName = type.TypeName();
 
             var parameters = new StringBuilder();
             var initializers = new StringBuilder();
             var text = new StringBuilder();
 
-            parameters.Append(string.Join(", ", fields.Select(f => $"{GetParameterTypeAsCsharp(f)} {FieldNameToSafeName(SnakeCaseToCamelCase(f.Name))} = default")));
+            parameters.Append(string.Join(", ", fields.Select(f => $"{f.ParameterType()} {f.CamelCase()} = default")));
             initializers.AppendLine(string.Join(Environment.NewLine, fields.Select(f =>
             {
                 var name = SnakeCaseToPascalCase(f.Name);
@@ -605,7 +572,7 @@ public static bool TryGetEvents({SchemaComponentUpdate} update{parameters})
                 // Allow `null` to represent an empty collection.
                 if (f.IsList() || f.IsMap())
                 {
-                    return $"{name} = {FieldNameToSafeName(SnakeCaseToCamelCase(f.Name))} == null ? {GetEmptyCollection(type, f)} : {InitializeFromParameter(type, f)};";
+                    return $"{name} = {f.CamelCase()} == null ? {GetEmptyCollection(type, f)} : {InitializeFromParameter(type, f)};";
                 }
 
                 return $"{name} = {InitializeFromParameter(type, f)};";

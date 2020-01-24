@@ -16,66 +16,6 @@ namespace Improbable.CSharpCodeGen
         public const string SchemaMapKeyFieldId = "global::Improbable.Worker.CInterop.SchemaObject.SchemaMapKeyFieldId";
         public const string SchemaMapValueFieldId = "global::Improbable.Worker.CInterop.SchemaObject.SchemaMapValueFieldId";
 
-        public static Dictionary<PrimitiveType, string> SchemaToCSharpTypes = new Dictionary<PrimitiveType, string>
-        {
-            {PrimitiveType.Double, "double"},
-            {PrimitiveType.Float, "float"},
-            {PrimitiveType.Int32, "int"},
-            {PrimitiveType.Int64, "long"},
-            {PrimitiveType.Uint32, "uint"},
-            {PrimitiveType.Uint64, "ulong"},
-            {PrimitiveType.Sint32, "int"},
-            {PrimitiveType.Sint64, "long"},
-            {PrimitiveType.Fixed32, "uint"},
-            {PrimitiveType.Fixed64, "ulong"},
-            {PrimitiveType.Sfixed32, "int"},
-            {PrimitiveType.Sfixed64, "long"},
-            {PrimitiveType.Bool, "bool"},
-            {PrimitiveType.String, "string"},
-            {PrimitiveType.Bytes, "byte[]"},
-            {PrimitiveType.EntityId, EntityIdType}
-        };
-
-        public static Dictionary<PrimitiveType, Func<string, string>> SchemaToHashFunction = new Dictionary<PrimitiveType, Func<string, string>>
-        {
-            {PrimitiveType.Double, f => $"{f}.GetHashCode()"},
-            {PrimitiveType.Float, f => $"{f}.GetHashCode()"},
-            {PrimitiveType.Int32, f => $"(int){f}"},
-            {PrimitiveType.Int64, f => $"(int){f}"},
-            {PrimitiveType.Uint32, f => $"(int){f}"},
-            {PrimitiveType.Uint64, f => $"(int){f}"},
-            {PrimitiveType.Sint32, f => f},
-            {PrimitiveType.Sint64, f => $"(int){f}"},
-            {PrimitiveType.Fixed32, f => $"(int){f}"},
-            {PrimitiveType.Fixed64, f => $"(int){f}"},
-            {PrimitiveType.Sfixed32, f => f},
-            {PrimitiveType.Sfixed64, f => $"(int){f}"},
-            {PrimitiveType.Bool, f => $"{f}.GetHashCode()"},
-            {PrimitiveType.String, f => $"{f} != null ? {f}.GetHashCode() : 0"},
-            {PrimitiveType.Bytes, f => $"{f}.GetHashCode()"},
-            {PrimitiveType.EntityId, f => $"{f}.GetHashCode()"}
-        };
-
-        public static Dictionary<PrimitiveType, Func<string, string>> SchemaToEqualsFunction = new Dictionary<PrimitiveType, Func<string, string>>
-        {
-            {PrimitiveType.Double, f => $"{f}.Equals(other.{f})"},
-            {PrimitiveType.Float, f => $"{f}.Equals(other.{f})"},
-            {PrimitiveType.Int32, f => $"{f} == other.{f}"},
-            {PrimitiveType.Int64, f => $"{f} == other.{f}"},
-            {PrimitiveType.Uint32, f => $"{f} == other.{f}"},
-            {PrimitiveType.Uint64, f => $"{f} == other.{f}"},
-            {PrimitiveType.Sint32, f => $"{f} == other.{f}"},
-            {PrimitiveType.Sint64, f => $"{f} == other.{f}"},
-            {PrimitiveType.Fixed32, f => $"{f} == other.{f}"},
-            {PrimitiveType.Fixed64, f => $"{f} == other.{f}"},
-            {PrimitiveType.Sfixed32, f => $"{f} == other.{f}"},
-            {PrimitiveType.Sfixed64, f => $"{f} == other.{f}"},
-            {PrimitiveType.Bool, f => $"{f} == other.{f}"},
-            {PrimitiveType.String, f => $"string.Equals({f}, other.{f})"},
-            {PrimitiveType.Bytes, f => $"Equals({f}, other.{f})"},
-            {PrimitiveType.EntityId, f => $"{EntityIdType}.Equals({f}, other.{f})"}
-        };
-
         public static HashSet<string> Keywords = new HashSet<string>
         {
             "abstract",
@@ -159,167 +99,221 @@ namespace Improbable.CSharpCodeGen
             "while"
         };
 
-        private static string GetTypeSuffix(TypeReference type)
+        public static string OptionTypeSuffix(this FieldDefinition field)
         {
-            return type.ValueTypeSelector switch
+            if (!field.IsOption())
+            {
+                throw new InvalidOperationException("Must be called for an option<> field");
+            }
+
+            return field.OptionType.InnerType.ValueTypeSelector switch
             {
                 ValueType.Enum => "?",
                 ValueType.Type => "?",
-                ValueType.Primitive when type.Primitive == PrimitiveType.String => string.Empty,
-                ValueType.Primitive when type.Primitive == PrimitiveType.Bytes => string.Empty,
+                ValueType.Primitive when field.HasPrimitive(PrimitiveType.String) => string.Empty,
+                ValueType.Primitive when field.HasPrimitive(PrimitiveType.Bytes) => string.Empty,
                 ValueType.Primitive => "?",
                 _ => throw new ArgumentOutOfRangeException()
             };
         }
 
-        private static string GetValueTestSuffix(TypeReference type)
+        public static string OptionValueTest(this FieldDefinition field)
         {
-            return type.ValueTypeSelector switch
+            if (!field.IsOption())
+            {
+                throw new InvalidOperationException("Must be called for an option<> field");
+            }
+
+            return field.OptionType.InnerType.ValueTypeSelector switch
             {
                 ValueType.Enum => ".HasValue",
-                ValueType.Primitive when type.Primitive == PrimitiveType.String => " != null",
-                ValueType.Primitive when type.Primitive == PrimitiveType.Bytes => " != null",
+                ValueType.Primitive when field.HasPrimitive(PrimitiveType.String) => " != null",
+                ValueType.Primitive when field.HasPrimitive(PrimitiveType.Bytes) => " != null",
                 ValueType.Primitive => ".HasValue",
                 ValueType.Type => ".HasValue",
                 _ => throw new ArgumentOutOfRangeException()
             };
         }
 
-        private static string GetValueSuffix(TypeReference type)
+        private static string OptionValueSuffix(this FieldDefinition field)
         {
-            return type.ValueTypeSelector switch
+            if (!field.IsOption())
+            {
+                throw new InvalidOperationException("Must be called for an option<> field");
+            }
+
+            return field.OptionType.InnerType.ValueTypeSelector switch
             {
                 ValueType.Enum => ".Value",
                 ValueType.Type => ".Value",
-                ValueType.Primitive when type.Primitive == PrimitiveType.String => string.Empty,
-                ValueType.Primitive when type.Primitive == PrimitiveType.Bytes => string.Empty,
+                ValueType.Primitive when field.HasPrimitive(PrimitiveType.String) => string.Empty,
+                ValueType.Primitive when field.HasPrimitive(PrimitiveType.Bytes) => string.Empty,
                 ValueType.Primitive => ".Value",
                 _ => throw new ArgumentOutOfRangeException()
             };
         }
 
-        public static string GetFieldTypeAsCsharp(TypeDescription type, FieldDefinition field)
-        {
-            return field.TypeSelector switch
+        public static string FqnFieldType(TypeDescription type, FieldDefinition field) =>
+            field.TypeSelector switch
             {
-                FieldType.Option => $"{TypeReferenceToType(field.OptionType.InnerType)}{GetTypeSuffix(field.OptionType.InnerType)}",
-                FieldType.Singular => TypeReferenceToType(field.SingularType.Type),
+                FieldType.Option => $"{field.InnerFqn()}{field.OptionTypeSuffix()}",
+                FieldType.Singular => field.InnerFqn(),
 
-                FieldType.List when IsFieldRecursive(type, field) => $"global::System.Collections.Generic.IReadOnlyList<{TypeReferenceToType(field.ListType.InnerType)}>",
-                FieldType.Map when IsFieldRecursive(type, field) => $"global::System.Collections.Generic.IReadOnlyDictionary<{TypeReferenceToType(field.MapType.KeyType)}, {TypeReferenceToType(field.MapType.ValueType)}>",
+                FieldType.List when IsFieldRecursive(type, field) => $"global::System.Collections.Generic.IReadOnlyList<{field.InnerFqn()}>",
+                FieldType.Map when IsFieldRecursive(type, field) => $"global::System.Collections.Generic.IReadOnlyDictionary<{field.MapType.KeyType.Fqn()}, {field.MapType.ValueType.Fqn()}>",
 
-                FieldType.List => $"global::System.Collections.Immutable.ImmutableArray<{TypeReferenceToType(field.ListType.InnerType)}>",
-                FieldType.Map => $"global::System.Collections.Immutable.ImmutableDictionary<{TypeReferenceToType(field.MapType.KeyType)}, {TypeReferenceToType(field.MapType.ValueType)}>",
+                FieldType.List => $"global::System.Collections.Immutable.ImmutableArray<{field.InnerFqn()}>",
+                FieldType.Map => $"global::System.Collections.Immutable.ImmutableDictionary<{field.MapType.KeyType.Fqn()}, {field.MapType.ValueType.Fqn()}>",
                 _ => throw new ArgumentOutOfRangeException()
             };
-        }
 
-        public static string GetParameterTypeAsCsharp(FieldDefinition field)
-        {
-            return field.TypeSelector switch
+        public static string ParameterType(this FieldDefinition field) =>
+            field.TypeSelector switch
             {
-                FieldType.Option => $"{TypeReferenceToType(field.OptionType.InnerType)}{GetTypeSuffix(field.OptionType.InnerType)}",
-                FieldType.List => $"global::System.Collections.Generic.IEnumerable<{TypeReferenceToType(field.ListType.InnerType)}>",
-                FieldType.Map => $"global::System.Collections.Generic.IEnumerable<global::System.Collections.Generic.KeyValuePair<{TypeReferenceToType(field.MapType.KeyType)}, {TypeReferenceToType(field.MapType.ValueType)}>>",
-                FieldType.Singular => TypeReferenceToType(field.SingularType.Type),
+                FieldType.Option => $"{field.InnerFqn()}{field.OptionTypeSuffix()}",
+                FieldType.List => $"global::System.Collections.Generic.IEnumerable<{field.InnerFqn()}>",
+                FieldType.Map => $"global::System.Collections.Generic.IEnumerable<global::System.Collections.Generic.KeyValuePair<{field.MapType.KeyType.Fqn()}, {field.MapType.ValueType.Fqn()}>>",
+                FieldType.Singular => field.SingularType.Type.Fqn(),
                 _ => throw new ArgumentOutOfRangeException()
             };
-        }
 
-        public static string GetEmptyCollection(TypeDescription type, FieldDefinition field)
-        {
-            return field.TypeSelector switch
+        public static string GetEmptyCollection(TypeDescription type, FieldDefinition field) =>
+            field.TypeSelector switch
             {
-                FieldType.List when IsFieldRecursive(type, field) => $"new global::System.Collections.Generic.List<{TypeReferenceToType(field.ListType.InnerType)}>()",
-                FieldType.Map when IsFieldRecursive(type, field) => $"new global::System.Collections.Generic.Dictionary<{TypeReferenceToType(field.MapType.KeyType)}, {TypeReferenceToType(field.MapType.ValueType)}>()",
+                FieldType.List when IsFieldRecursive(type, field) => $"new global::System.Collections.Generic.List<{field.InnerFqn()}>()",
+                FieldType.Map when IsFieldRecursive(type, field) => $"new global::System.Collections.Generic.Dictionary<{field.MapType.KeyType.Fqn()}, {field.MapType.ValueType.Fqn()}>()",
 
-                FieldType.List => $"global::System.Collections.Immutable.ImmutableArray<{TypeReferenceToType(field.ListType.InnerType)}>.Empty",
-                FieldType.Map => $"global::System.Collections.Immutable.ImmutableDictionary<{TypeReferenceToType(field.MapType.KeyType)}, {TypeReferenceToType(field.MapType.ValueType)}>.Empty",
+                FieldType.List => $"global::System.Collections.Immutable.ImmutableArray<{field.InnerFqn()}>.Empty",
+                FieldType.Map => $"global::System.Collections.Immutable.ImmutableDictionary<{field.MapType.KeyType.Fqn()}, {field.MapType.ValueType.Fqn()}>.Empty",
 
                 _ => throw new ArgumentOutOfRangeException(nameof(field.TypeSelector))
             };
-        }
 
-        public static string InitializeFromParameter(TypeDescription type, FieldDefinition field)
-        {
-            return field.TypeSelector switch
+        public static string InitializeFromParameter(TypeDescription type, FieldDefinition field) =>
+            field.TypeSelector switch
             {
-                FieldType.List when IsFieldRecursive(type, field) => $"new global::System.Collections.Generic.List<{TypeReferenceToType(field.ListType.InnerType)}>({FieldNameToSafeName(SnakeCaseToCamelCase(field.Name))})",
-                FieldType.Map when IsFieldRecursive(type, field) => $"global::System.Linq.Enumerable.ToDictionary({FieldNameToSafeName(SnakeCaseToCamelCase(field.Name))}, kv => kv.Key, kv => kv.Value)",
+                FieldType.List when IsFieldRecursive(type, field) => $"new global::System.Collections.Generic.List<{field.InnerFqn()}>({field.CamelCase()})",
+                FieldType.Map when IsFieldRecursive(type, field) => $"global::System.Linq.Enumerable.ToDictionary({field.CamelCase()}, kv => kv.Key, kv => kv.Value)",
 
-                FieldType.List => $"global::System.Collections.Immutable.ImmutableArray.ToImmutableArray({FieldNameToSafeName(SnakeCaseToCamelCase(field.Name))})",
-                FieldType.Map => $"global::System.Collections.Immutable.ImmutableDictionary.ToImmutableDictionary({FieldNameToSafeName(SnakeCaseToCamelCase(field.Name))})",
+                FieldType.List => $"global::System.Collections.Immutable.ImmutableArray.ToImmutableArray({field.CamelCase()})",
+                FieldType.Map => $"global::System.Collections.Immutable.ImmutableDictionary.ToImmutableDictionary({field.CamelCase()})",
 
-                _ => $"{FieldNameToSafeName(SnakeCaseToCamelCase(field.Name))}"
+                _ => field.CamelCase()
             };
-        }
 
-        public static string GetTypeAsCsharp(TypeReference type)
-        {
-            return type.ValueTypeSelector switch
-            {
-                ValueType.Enum => CapitalizeNamespace(type.Enum),
-                ValueType.Primitive => SchemaToCSharpTypes[type.Primitive],
-                ValueType.Type => CapitalizeNamespace(type.Type),
-                _ => throw new ArgumentOutOfRangeException()
-            };
-        }
-
-        public static string GetEmptyFieldInstantiationAsCsharp(TypeDescription type, FieldDefinition field)
-        {
-            return field.TypeSelector switch
+        public static string GetEmptyFieldInstantiationAsCsharp(TypeDescription type, FieldDefinition field) =>
+            field.TypeSelector switch
             {
                 FieldType.Option => "null",
-                FieldType.Singular => TypeReferenceToType(field.SingularType.Type),
+                FieldType.Singular => field.SingularType.Type.Fqn(),
 
-                FieldType.List when IsFieldRecursive(type, field) => $"new global::System.Collections.Generic.List<{TypeReferenceToType(field.ListType.InnerType)}>()",
-                FieldType.Map when IsFieldRecursive(type, field)  => $"new global::System.Collections.Generic.Dictionary<{TypeReferenceToType(field.MapType.KeyType)}, {TypeReferenceToType(field.MapType.ValueType)}>()",
+                FieldType.List when IsFieldRecursive(type, field) => $"new global::System.Collections.Generic.List<{field.InnerFqn()}>()",
+                FieldType.Map when IsFieldRecursive(type, field)  => $"new global::System.Collections.Generic.Dictionary<{field.MapType.KeyType.Fqn()}, {field.MapType.ValueType.Fqn()}>()",
 
-                FieldType.List => $"global::System.Collections.Immutable.ImmutableArray<{TypeReferenceToType(field.ListType.InnerType)}>.Empty",
-                FieldType.Map => $"global::System.Collections.Immutable.ImmutableDictionary<{TypeReferenceToType(field.MapType.KeyType)}, {TypeReferenceToType(field.MapType.ValueType)}>.Empty",
+                FieldType.List => $"global::System.Collections.Immutable.ImmutableArray<{field.InnerFqn()}>.Empty",
+                FieldType.Map => $"global::System.Collections.Immutable.ImmutableDictionary<{field.MapType.KeyType.Fqn()}, {field.MapType.ValueType.Fqn()}>.Empty",
 
                 _ => throw new ArgumentOutOfRangeException()
-
             };
-        }
 
-        public static string TypeReferenceToType(TypeReference typeRef)
+        public static string PascalCase(this FieldDefinition field) => SnakeCaseToPascalCase(field.Name);
+
+        public static string CamelCase(this FieldDefinition field)
         {
-            return typeRef.ValueTypeSelector switch
+            var name = SnakeCaseToCamelCase(field.Name);
+            return !Keywords.Contains(name) ? name : $"@{name}";
+        }
+
+        public static string CamelCase(this ComponentDefinition.EventDefinition evt)
+        {
+            var name = SnakeCaseToCamelCase(evt.Name);
+            return !Keywords.Contains(name) ? name : $"@{name}";
+        }
+
+        public static string Fqn(this ComponentDefinition.EventDefinition evt) => Case.Fqn(evt.Type);
+
+        public static string Fqn(this TypeReference typeRef) =>
+            typeRef.ValueTypeSelector switch
             {
-                ValueType.Enum => $"global::{CapitalizeNamespace(typeRef.Enum)}",
-                ValueType.Primitive => SchemaToCSharpTypes[typeRef.Primitive],
-                ValueType.Type => $"global::{CapitalizeNamespace(typeRef.Type)}",
+                ValueType.Enum => $"{Case.Fqn(typeRef.Enum)}",
+                ValueType.Primitive => typeRef.Primitive switch
+                {
+                    PrimitiveType.Double => "double",
+                    PrimitiveType.Float => "float",
+                    PrimitiveType.Int32 => "int",
+                    PrimitiveType.Int64 => "long",
+                    PrimitiveType.Uint32 => "uint",
+                    PrimitiveType.Uint64 => "ulong",
+                    PrimitiveType.Sint32 => "int",
+                    PrimitiveType.Sint64 => "long",
+                    PrimitiveType.Fixed32 => "uint",
+                    PrimitiveType.Fixed64 => "ulong",
+                    PrimitiveType.Sfixed32 => "int",
+                    PrimitiveType.Sfixed64 => "long",
+                    PrimitiveType.Bool => "bool",
+                    PrimitiveType.String => "string",
+                    PrimitiveType.Bytes => "byte[]",
+                    PrimitiveType.EntityId => EntityIdType,
+                    PrimitiveType.Invalid => throw new InvalidOperationException("Invalid primitive type"),
+                    PrimitiveType.Entity => throw new InvalidOperationException("The entity schema type is not supported"),
+                    _ => throw new ArgumentOutOfRangeException()
+                },
+                ValueType.Type => $"{Case.Fqn(typeRef.Type)}",
                 _ => throw new ArgumentOutOfRangeException()
             };
-        }
 
         public static string FieldToHash(FieldDefinition field)
         {
-            var fieldName = SnakeCaseToPascalCase(field.Name);
+            var fieldName = field.PascalCase();
 
             return field.TypeSelector switch
             {
-                FieldType.Option => $"{fieldName}{GetValueTestSuffix(field.OptionType.InnerType)} ? {fieldName}{GetValueSuffix(field.OptionType.InnerType)}.GetHashCode() : 0",
+                FieldType.Option => $"{fieldName}{field.OptionValueTest()} ? {fieldName}{field.OptionValueSuffix()}.GetHashCode() : 0",
                 FieldType.List => $"{fieldName} == null ? {fieldName}.GetHashCode() : 0",
                 FieldType.Map => $"{fieldName} == null ? {fieldName}.GetHashCode() : 0",
                 FieldType.Singular when !field.HasPrimitive() => $"{fieldName}.GetHashCode()",
-                FieldType.Singular => SchemaToHashFunction[field.SingularType.Type.Primitive](fieldName),
+                FieldType.Singular => field.SingularType.Type.Primitive switch
+                {
+                    PrimitiveType.Double => $"{fieldName}.GetHashCode()",
+                    PrimitiveType.Float => $"{fieldName}.GetHashCode()",
+                    PrimitiveType.Sint32 => fieldName,
+                    PrimitiveType.Sfixed32 => fieldName,
+                    PrimitiveType.Bool => $"{fieldName}.GetHashCode()",
+                    PrimitiveType.String => $"{fieldName} != null ? {fieldName}.GetHashCode() : 0",
+                    PrimitiveType.Bytes => $"{fieldName}.GetHashCode()",
+                    PrimitiveType.EntityId => $"{fieldName}.GetHashCode()",
+                    PrimitiveType.Invalid => throw new InvalidOperationException("Invalid primitive type"),
+                    PrimitiveType.Entity => throw new InvalidOperationException("The entity schema type is not supported"),
+                    _ => $"(int) {fieldName}"
+                },
                 _ => throw new ArgumentOutOfRangeException()
             };
         }
 
         public static string FieldToEquals(FieldDefinition field)
         {
-            var fieldName = SnakeCaseToPascalCase(field.Name);
+            var fieldName = field.PascalCase();
+
+            const string structuralComparer = "global::System.Collections.StructuralComparisons.StructuralEqualityComparer";
 
             return field.TypeSelector switch
             {
                 FieldType.Option => $"{fieldName} == other.{fieldName}",
-                FieldType.List => $"global::System.Collections.StructuralComparisons.StructuralEqualityComparer.Equals({fieldName}, other.{fieldName})",
-                FieldType.Map => $"global::System.Collections.StructuralComparisons.StructuralEqualityComparer.Equals({fieldName}, other.{fieldName})",
+                FieldType.List => $"{structuralComparer}.Equals({fieldName}, other.{fieldName})",
+                FieldType.Map => $"{structuralComparer}.Equals({fieldName}, other.{fieldName})",
+
                 FieldType.Singular when !field.HasPrimitive() => $"{fieldName} == other.{fieldName}",
-                FieldType.Singular => SchemaToEqualsFunction[field.SingularType.Type.Primitive](fieldName),
+                FieldType.Singular => field.SingularType.Type.Primitive switch
+                {
+                    PrimitiveType.Double => $"{fieldName}.Equals(other.{fieldName})",
+                    PrimitiveType.Float => $"{fieldName}.Equals(other.{fieldName})",
+                    PrimitiveType.String => $"string.Equals({fieldName}, other.{fieldName})",
+                    PrimitiveType.Bytes => $"Equals({fieldName}, other.{fieldName})",
+                    PrimitiveType.EntityId => $"{EntityIdType}.Equals({fieldName}, other.{fieldName})",
+                    PrimitiveType.Invalid => throw new InvalidOperationException("Invalid primitive type"),
+                    PrimitiveType.Entity => throw new InvalidOperationException("The entity schema type is not supported"),
+                    _ => $"{fieldName} == other.{fieldName}"
+                },
                 _ => throw new ArgumentOutOfRangeException()
             };
         }
@@ -328,19 +322,12 @@ namespace Improbable.CSharpCodeGen
         {
             return field.TypeSelector switch
             {
-                FieldType.Option when field.HasEnum() => "GetEnum",
-                FieldType.Option when field.HasPrimitive() => $"Get{field.OptionType.InnerType.Primitive}",
-                FieldType.Option when field.HasCustomType() => "GetObject",
-
-                FieldType.List when field.HasEnum() => "GetEnum",
-                FieldType.List when field.HasPrimitive() => $"Get{field.ListType.InnerType.Primitive}",
                 FieldType.List when field.HasCustomType() => "IndexObject",
-
                 FieldType.Map => "IndexObject",
-
-                FieldType.Singular when field.HasEnum() => "GetEnum",
-                FieldType.Singular when field.HasPrimitive() => $"Get{field.SingularType.Type.Primitive}",
-                FieldType.Singular when field.HasCustomType() => "GetObject",
+                
+                _ when field.HasPrimitive() => $"Get{field.InnerPrimitiveType()}",
+                _ when field.HasEnum() => "GetEnum",
+                _ when field.HasCustomType() => "GetObject",
 
                 _ => throw new ArgumentOutOfRangeException()
             };
@@ -350,21 +337,11 @@ namespace Improbable.CSharpCodeGen
         {
             return field.TypeSelector switch
             {
-                FieldType.Option when field.HasEnum() => "AddEnum",
-                FieldType.Option when field.HasPrimitive() => $"Add{field.OptionType.InnerType.Primitive}",
-                FieldType.Option when field.HasCustomType() => "AddObject",
-
-                FieldType.List when field.HasEnum() => "AddEnum",
-                FieldType.List when field.HasPrimitive(PrimitiveType.String) => "AddString",
-                FieldType.List when field.HasPrimitive(PrimitiveType.Bytes) => "AddBytes",
-                FieldType.List when field.HasPrimitive() => $"Add{field.ListType.InnerType.Primitive}",
-                FieldType.List when field.HasCustomType() => "AddObject",
-
                 FieldType.Map => "AddObject",
 
-                FieldType.Singular when field.HasEnum() => "AddEnum",
-                FieldType.Singular when field.HasPrimitive() => $"Add{field.SingularType.Type.Primitive}",
-                FieldType.Singular when field.HasCustomType() => "AddObject",
+                _ when field.HasPrimitive() => $"Add{field.InnerPrimitiveType()}",
+                _ when field.HasEnum() => "AddEnum",
+                _ when field.HasCustomType() => "AddObject",
 
                 _ => throw new ArgumentOutOfRangeException()
             };
@@ -374,19 +351,11 @@ namespace Improbable.CSharpCodeGen
         {
             return field.TypeSelector switch
             {
-                FieldType.Option when field.HasEnum() => "GetEnumCount",
-                FieldType.Option when field.HasPrimitive() => $"Get{field.OptionType.InnerType.Primitive}Count",
-                FieldType.Option when field.HasCustomType() => "GetObjectCount",
-
-                FieldType.List when field.HasEnum() => "GetEnumCount",
-                FieldType.List when field.HasPrimitive() => $"Get{field.ListType.InnerType.Primitive}Count",
-                FieldType.List when field.HasCustomType() => "GetObjectCount",
-
                 FieldType.Map => "GetObjectCount",
 
-                FieldType.Singular when field.HasEnum() => "GetEnumCount",
-                FieldType.Singular when field.HasPrimitive() => $"Get{field.SingularType.Type.Primitive}Count",
-                FieldType.Singular when field.HasCustomType() => "GetObjectCount",
+                _ when field.HasPrimitive() => $"Get{field.InnerPrimitiveType()}Count",
+                _ when field.HasEnum() => "GetEnumCount",
+                _ when field.HasCustomType() => "GetObjectCount",
 
                 _ => throw new ArgumentOutOfRangeException()
             };
@@ -396,19 +365,11 @@ namespace Improbable.CSharpCodeGen
         {
             return field.TypeSelector switch
             {
-                FieldType.Option when field.HasEnum() => "IndexEnum",
-                FieldType.Option when field.HasPrimitive() => $"Index{field.OptionType.InnerType.Primitive}",
-                FieldType.Option when field.HasCustomType() => "IndexObject",
-
-                FieldType.List when field.HasEnum() => "IndexEnum",
-                FieldType.List when field.HasPrimitive() => $"Index{field.ListType.InnerType.Primitive}",
-                FieldType.List when field.HasCustomType() => "IndexObject",
-
                 FieldType.Map => "IndexObject",
 
-                FieldType.Singular when field.HasEnum() => "IndexEnum",
-                FieldType.Singular when field.HasPrimitive() => $"Index{field.SingularType.Type.Primitive}",
-                FieldType.Singular when field.HasCustomType() => "IndexObject",
+                _ when field.HasPrimitive() => $"Index{field.InnerPrimitiveType()}",
+                _ when field.HasEnum() => "IndexEnum",
+                _ when field.HasCustomType() => "IndexObject",
 
                 _ => throw new ArgumentOutOfRangeException()
             };
@@ -422,11 +383,6 @@ namespace Improbable.CSharpCodeGen
             return Path.Combine(folder, $"{path.Last()}.g.cs");
         }
 
-        public static string FieldNameToSafeName(string name)
-        {
-            return !Keywords.Contains(name) ? name : $"@{name}";
-        }
-
         public static bool HasAnnotation(TypeDescription t, string attributeName)
         {
             return t.Annotations.Any(a => a.TypeValue.Type == attributeName);
@@ -437,7 +393,7 @@ namespace Improbable.CSharpCodeGen
             return field.TypeSelector switch
             {
                 FieldType.Map => (field.MapType.KeyType.HasCustomType(type.QualifiedName) || field.MapType.ValueType.HasCustomType(type.QualifiedName)),
-                _ => field.HasCustomType(type.QualifiedName),
+                _ => field.HasCustomType(type.QualifiedName)
             };
         }
 
@@ -452,17 +408,64 @@ namespace Improbable.CSharpCodeGen
             };
         }
 
+        public static PrimitiveType InnerPrimitiveType(this FieldDefinition field)
+        {
+            if (!field.HasPrimitive())
+            {
+                throw new InvalidOperationException("Called on field without a primitive type.");
+            }
 
-        public static string GetInnerTypeAsCsharp(FieldDefinition field)
+            return field.TypeSelector switch
+            {
+                FieldType.Option => field.OptionType.InnerType.Primitive,
+                FieldType.List => field.ListType.InnerType.Primitive,
+                FieldType.Map => throw new InvalidOperationException("Invalid for the map type. Check the key and value types individually."),
+                FieldType.Singular => field.SingularType.Type.Primitive,
+                _ => throw new ArgumentOutOfRangeException()
+            };
+        }
+
+
+        public static string InnerFqn(this FieldDefinition field)
         {
             return field.TypeSelector switch
             {
-                FieldType.Option => TypeReferenceToType(field.OptionType.InnerType),
-                FieldType.List => TypeReferenceToType(field.ListType.InnerType),
-                FieldType.Map => $"global::System.Collections.Generic.KeyValuePair<{TypeReferenceToType(field.MapType.KeyType)}, {TypeReferenceToType(field.MapType.ValueType)}>",
-                FieldType.Singular => TypeReferenceToType(field.SingularType.Type),
+                FieldType.Option => field.OptionType.InnerType.Fqn(),
+                FieldType.List => field.ListType.InnerType.Fqn(),
+                FieldType.Map => $"global::System.Collections.Generic.KeyValuePair<{field.MapType.KeyType.Fqn()}, {field.MapType.ValueType.Fqn()}>",
+                FieldType.Singular => field.SingularType.Type.Fqn(),
                 _ => throw new ArgumentOutOfRangeException()
             };
+        }
+
+        public static string Namespace(this EnumDefinition type) => Case.Namespace(type.QualifiedName);
+
+        public static string Namespace(this TypeDescription type) => Case.Namespace(type.QualifiedName);
+
+        public static string Fqn(this TypeDescription type) => Case.Fqn(type.QualifiedName);
+
+        public static (string request, string response) InnerFqns(this ComponentDefinition.CommandDefinition cmd) => (Case.Fqn(cmd.RequestType), Case.Fqn(cmd.ResponseType));
+
+        public static string Name(this ComponentDefinition.CommandDefinition cmd) => (SnakeCaseToPascalCase(cmd.Name));
+
+        public static string TypeName(this TypeDescription type)
+        {
+            return SnakeCaseToPascalCase(type.QualifiedName).Split('.').Last();
+        }
+
+        public static string Name(this EnumValueDefinition value)
+        {
+            return value.Name.Split(new[] { "_" }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(part =>
+                {
+                    if (part.Length == 1)
+                    {
+                        return part;
+                    }
+
+                    return part[0] + part.Substring(1, part.Length - 1).ToLowerInvariant();
+                })
+                .Aggregate(string.Empty, (s1, s2) => s1 + s2);
         }
     }
 }

@@ -14,7 +14,7 @@ namespace Improbable.Stdlib
     {
         public delegate TComponent CreateDelegate(SchemaComponentData? data);
 
-        public delegate TComponent UpdateDelegate(TComponent original, SchemaComponentUpdate? update);
+        public delegate TComponent UpdateDelegate(in TComponent original, SchemaComponentUpdate? update);
 
         private readonly HashSet<EntityId> authority = new HashSet<EntityId>();
         private readonly uint componentId;

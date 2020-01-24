@@ -31,8 +31,8 @@ namespace Improbable.Schema.Bundle
         public readonly uint? ComponentId;
 
         /// <summary>
-        /// If true, this is a restricted Improbable component, which workers can never gain authority over.
-        /// Code generators can use this to avoid generating code that may be nonsensical or confusing.
+        ///     If true, this is a restricted Improbable component, which workers can never gain authority over.
+        ///     Code generators can use this to avoid generating code that may be nonsensical or confusing.
         /// </summary>
         public readonly bool IsRestricted;
 
@@ -42,7 +42,8 @@ namespace Improbable.Schema.Bundle
 
             IsRestricted = qualifiedName.StartsWith("improbable.restricted");
 
-            NestedEnums = bundle.Enums.Where(e => e.Value.OuterType == qualifiedName).Select(type => bundle.Enums[type.Key]).ToList();
+            NestedEnums = bundle.Enums.Where(e => e.Value.OuterType == qualifiedName)
+                .Select(type => bundle.Enums[type.Key]).ToList();
 
             bundle.Components.TryGetValue(qualifiedName, out var component);
             ComponentId = component?.ComponentId;
@@ -60,11 +61,8 @@ namespace Improbable.Schema.Bundle
                 OuterType = bundle.Types[qualifiedName].OuterType;
             }
 
-            NestedTypes = bundle.Types.Where(t => t.Value.OuterType == qualifiedName).Select(type =>
-            {
-                var t = bundle.Types[type.Key];
-                return new TypeDescription(t.QualifiedName, bundle);
-            }).ToList();
+            NestedTypes = bundle.Types.Where(t => t.Value.OuterType == qualifiedName)
+                .Select(type => new TypeDescription(bundle.Types[type.Key].QualifiedName, bundle)).ToList();
 
             Fields = component?.Fields;
 
@@ -119,10 +117,11 @@ namespace Improbable.Schema.Bundle
                 _ => f.HasPrimitive(PrimitiveType.Entity)
             };
         }
+
         private static bool IsFieldTypeRecursive(Bundle bundle, string qualifiedRootTypeName, FieldDefinition field)
         {
             return field.IsOption() &&
-                   (field.HasCustomType(qualifiedRootTypeName) || (field.HasCustomType() && bundle.Types[field.OptionType.InnerType.Type].Fields.Any(f => IsFieldTypeRecursive(bundle, qualifiedRootTypeName, f))));
+                   (field.HasCustomType(qualifiedRootTypeName) || field.HasCustomType() && bundle.Types[field.OptionType.InnerType.Type].Fields.Any(f => IsFieldTypeRecursive(bundle, qualifiedRootTypeName, f)));
         }
     }
 }

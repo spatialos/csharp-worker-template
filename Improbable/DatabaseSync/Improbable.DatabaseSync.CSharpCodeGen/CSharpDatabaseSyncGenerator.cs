@@ -6,7 +6,6 @@ using Improbable.Schema.Bundle;
 using static Improbable.DatabaseSync.CSharpCodeGen.WellKnownAnnotations;
 using static Improbable.CSharpCodeGen.Case;
 using static Improbable.CSharpCodeGen.Types;
-using ValueType = Improbable.Schema.Bundle.ValueType;
 
 namespace Improbable.DatabaseSync.CSharpCodeGen
 {
@@ -84,7 +83,7 @@ public static string GetProfileIdFromComponentData(global::Improbable.Worker.CIn
     return fields.GetString({profileIdField.FieldId});
 }}
 
-public static string ComponentToDatabase(string databaseName, in global::{CapitalizeNamespace(type.QualifiedName)} item)
+public static string ComponentToDatabase(string databaseName, in {type.Fqn()} item)
 {{
     if (string.IsNullOrEmpty(item.{profileFieldName}))
     {{
