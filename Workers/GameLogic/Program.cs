@@ -86,14 +86,13 @@ namespace GameLogic
                 DefaultComponentVtable = new ComponentVtable()
             };
 
-            using (var asyncConnection = await WorkerConnection.ConnectAsync(options, connectionParameters))
+            using (var connection = await WorkerConnection.ConnectAsync(options, connectionParameters).ConfigureAwait(false))
             {
-                asyncConnection.StartSendingMetrics();
+                connection.StartSendingMetrics();
 
-                foreach (var opList in asyncConnection.GetOpLists(TimeSpan.FromMilliseconds(0)))
+                foreach (var opList in connection.GetOpLists())
                 {
                     ProcessOpList(opList);
-                    asyncConnection.ProcessOpList(opList);
                 }
             }
 

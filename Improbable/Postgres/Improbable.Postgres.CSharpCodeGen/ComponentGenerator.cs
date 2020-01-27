@@ -6,7 +6,7 @@ using Improbable.CSharpCodeGen;
 using Improbable.Schema.Bundle;
 using static Improbable.CSharpCodeGen.Types;
 using static Improbable.CSharpCodeGen.Case;
-using ValueType = Improbable.Schema.Bundle.ValueType;
+using FieldType = Improbable.Schema.Bundle.FieldType;
 
 namespace Improbable.Postgres.CSharpCodeGen
 {
@@ -37,7 +37,7 @@ namespace Improbable.Postgres.CSharpCodeGen
 
             var indexFields = type.Fields.WithAnnotation(WellKnownAnnotations.IndexAttribute);
 
-            var typeName = $"global::{CapitalizeNamespace(type.QualifiedName)}";
+            var typeName = $"{type.Fqn()}";
 
             return $@"public static string CreateTypeTable(string tableName)
 {{
@@ -60,9 +60,9 @@ public const string SelectClause = ""{selectClause}"";
 
 public struct DatabaseChangeNotification
 {{
-    public {CapitalizeNamespace(type.QualifiedName)}? Old {{ get; set; }}
+    public {type.Fqn()}? Old {{ get; set; }}
 
-    public {CapitalizeNamespace(type.QualifiedName)} New {{ get; set; }}
+    public {type.Fqn()} New {{ get; set; }}
 }}
 
 public static string InitializeDatabase(string tableName)
@@ -114,7 +114,7 @@ CREATE TRIGGER notify_{{tableName}}_tgr
 
         private static string PostgresTypeConversion(FieldDefinition f)
         {
-            switch (f.TypeSelector)
+            return f.TypeSelector switch
             {
                 case FieldType.Option:
                     if (f.OptionType.InnerType.ValueTypeSelector == ValueType.Primitive)
@@ -160,7 +160,7 @@ CREATE TRIGGER notify_{{tableName}}_tgr
                 var databaseType = field.Annotations.GetAnnotationString(WellKnownAnnotations.FieldTypeAttribute, 0);
                 if (string.IsNullOrEmpty(databaseType))
                 {
-                    switch (field.TypeSelector)
+                    databaseType = field.TypeSelector switch
                     {
                         case FieldType.Option:
                             databaseType = field.OptionType.InnerType.ValueTypeSelector switch

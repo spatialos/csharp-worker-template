@@ -180,15 +180,14 @@ namespace Improbable.Schema.Bundle
     {
         public ImmutableArray<Annotation> Annotations;
 
+        public string Name;
         public uint FieldId;
 
         public ListTypeRef ListType;
         public MapTypeRef MapType;
-
-        public string Name;
         public OptionTypeRef OptionType;
-
         public SingularTypeRef SingularType;
+
         public SourceReference SourceReference;
 
         public bool Transient;

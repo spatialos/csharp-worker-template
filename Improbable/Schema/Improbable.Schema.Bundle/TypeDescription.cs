@@ -28,11 +28,13 @@ namespace Improbable.Schema.Bundle
 
         public readonly ImmutableArray<string> Warnings;
 
+        public readonly IReadOnlyList<string> Warnings;
+
         public readonly uint? ComponentId;
 
         /// <summary>
-        /// If true, this is a restricted Improbable component, which workers can never gain authority over.
-        /// Code generators can use this to avoid generating code that may be nonsensical or confusing.
+        ///     If true, this is a restricted Improbable component, which workers can never gain authority over.
+        ///     Code generators can use this to avoid generating code that may be nonsensical or confusing.
         /// </summary>
         public readonly bool IsRestricted;
 
@@ -77,9 +79,9 @@ namespace Improbable.Schema.Bundle
             var warnings = ImmutableArray<string>.Empty;
             Fields = ImmutableArray.CreateRange(Fields.Where(f =>
             {
-                var allowed = !IsPrimitiveEntityField(f);
+                var isEntityField = IsPrimitiveEntityField(f);
 
-                if (!allowed)
+                if (isEntityField)
                 {
                     warnings = warnings.Add($"field '{qualifiedName}.{f.Name}' is the Entity type, which is currently unsupported.");
                 }

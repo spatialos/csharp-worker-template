@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
 using Improbable.Worker.CInterop;
 
 namespace Improbable.Stdlib
@@ -10,6 +11,8 @@ namespace Improbable.Stdlib
         public readonly List<Op> Ops;
 
         private readonly Worker.CInterop.OpList? rawOps;
+
+        public static OpList Empty = new OpList();
 
         public OpList()
         {
@@ -99,6 +102,7 @@ namespace Improbable.Stdlib
             return GetEnumerator();
         }
 
+        [DebuggerDisplay("{" + nameof(OpType) + "}")]
         public struct Op
         {
             public OpType OpType;

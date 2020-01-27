@@ -155,10 +155,11 @@ namespace Improbable.CSharpCodeGen
             "virtual",
             "void",
             "volatile",
+            "when",
             "while"
         };
 
-        public static string GetOptionType(TypeReference type)
+        public static string OptionTypeSuffix(this FieldDefinition field)
         {
             return type.ValueTypeSelector switch
             {
@@ -174,7 +175,7 @@ namespace Improbable.CSharpCodeGen
             };
         }
 
-        public static string GetOptionTest(TypeReference type)
+        public static string OptionValueTest(this FieldDefinition field)
         {
             return type.ValueTypeSelector switch
             {
@@ -190,7 +191,7 @@ namespace Improbable.CSharpCodeGen
             };
         }
 
-        public static string GetOptionValue(TypeReference type)
+        private static string OptionValueSuffix(this FieldDefinition field)
         {
             return type.ValueTypeSelector switch
             {
@@ -288,7 +289,9 @@ namespace Improbable.CSharpCodeGen
             };
         }
 
-        public static string GetTypeAsCsharp(TypeReference type)
+        public static string PascalCase(this FieldDefinition field) => SnakeCaseToPascalCase(field.Name);
+
+        public static string CamelCase(this FieldDefinition field)
         {
             return type.ValueTypeSelector switch
             {
@@ -299,7 +302,7 @@ namespace Improbable.CSharpCodeGen
             };
         }
 
-        public static string GetEmptyFieldInstantiationAsCsharp(TypeDescription type, FieldDefinition field)
+        public static string CamelCase(this ComponentDefinition.EventDefinition evt)
         {
             switch (field.TypeSelector)
             {
@@ -340,30 +343,35 @@ namespace Improbable.CSharpCodeGen
 
         public static string FieldToHash(FieldDefinition field)
         {
-            var fieldName = SnakeCaseToPascalCase(field.Name);
+            var fieldName = field.PascalCase();
 
-            switch (field.TypeSelector)
+            return field.TypeSelector switch
             {
-                case FieldType.Option:
-                    return $"{fieldName}{GetOptionTest(field.OptionType.InnerType)} ? {fieldName}{GetOptionValue(field.OptionType.InnerType)}.GetHashCode() : 0";
-                case FieldType.List:
-                case FieldType.Map:
-                    return $"{fieldName} == null ? {fieldName}.GetHashCode() : 0";
-                case FieldType.Singular:
-                    if (field.SingularType.Type.Primitive == PrimitiveType.Invalid)
-                    {
-                        return $"{fieldName}.GetHashCode()";
-                    }
-
-                    return SchemaToHashFunction[field.SingularType.Type.Primitive](fieldName);
-                default:
-                    throw new ArgumentOutOfRangeException();
-            }
+                FieldType.Option => $"{fieldName}{field.OptionValueTest()} ? {fieldName}{field.OptionValueSuffix()}.GetHashCode() : 0",
+                FieldType.List => $"{fieldName} == null ? {fieldName}.GetHashCode() : 0",
+                FieldType.Map => $"{fieldName} == null ? {fieldName}.GetHashCode() : 0",
+                FieldType.Singular when !field.HasPrimitive() => $"{fieldName}.GetHashCode()",
+                FieldType.Singular => field.SingularType.Type.Primitive switch
+                {
+                    PrimitiveType.Double => $"{fieldName}.GetHashCode()",
+                    PrimitiveType.Float => $"{fieldName}.GetHashCode()",
+                    PrimitiveType.Sint32 => fieldName,
+                    PrimitiveType.Sfixed32 => fieldName,
+                    PrimitiveType.Bool => $"{fieldName}.GetHashCode()",
+                    PrimitiveType.String => $"{fieldName} != null ? {fieldName}.GetHashCode() : 0",
+                    PrimitiveType.Bytes => $"{fieldName}.GetHashCode()",
+                    PrimitiveType.EntityId => $"{fieldName}.GetHashCode()",
+                    PrimitiveType.Invalid => throw new InvalidOperationException("Invalid primitive type"),
+                    PrimitiveType.Entity => throw new InvalidOperationException("The entity schema type is not supported"),
+                    _ => $"(int) {fieldName}"
+                },
+                _ => throw new ArgumentOutOfRangeException()
+            };
         }
 
         public static string FieldToEquals(FieldDefinition field)
         {
-            var fieldName = SnakeCaseToPascalCase(field.Name);
+            var fieldName = field.PascalCase();
 
             switch (field.TypeSelector)
             {
@@ -482,17 +490,23 @@ namespace Improbable.CSharpCodeGen
             return Path.Combine(folder, $"{path.Last()}.g.cs");
         }
 
-        public static string FieldNameToSafeName(string name)
+        public static bool HasAnnotation(TypeDescription t, string attributeName)
         {
             return !Keywords.Contains(name) ? name : $"@{name}";
         }
 
-        public static bool HasAnnotation(TypeDescription t, string attributeName)
+        public static string GetTypeReferenceGetter(TypeReference type)
         {
-            return t.Annotations.Any(a => a.TypeValue.Type == attributeName);
+            return type.ValueTypeSelector switch
+            {
+                ValueType.Enum => "GetEnum",
+                ValueType.Primitive => $"Get{type.Primitive}",
+                ValueType.Type => "GetObject",
+                _ => throw new ArgumentOutOfRangeException()
+            };
         }
 
-        public static bool IsFieldRecursive(TypeDescription type, FieldDefinition field)
+        public static PrimitiveType InnerPrimitiveType(this FieldDefinition field)
         {
             return field.TypeSelector switch
             {

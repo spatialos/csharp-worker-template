@@ -66,17 +66,16 @@ namespace Improbable.CSharpCodeGen
             text.Append($@"
 public {typeName}(params {innerType}[] {FieldNameToSafeName(SnakeCaseToCamelCase(field.Name))})
 {{
-    {SnakeCaseToPascalCase(field.Name)} = {ParameterConversion(type, field)};
-}}");
+    {field.PascalCase()} = {InitializeFromParameter(type, field)};
+}}";
 
-            return text.ToString();
         }
 
         public string GenerateEquatable(TypeDescription type, IReadOnlyList<FieldDefinition> fields)
         {
             var hashFields = new StringBuilder();
             var equalsFields = new StringBuilder();
-            var typeName = GetPascalCaseNameFromTypeName(type.QualifiedName);
+            var typeName = type.TypeName();
 
             if (!fields.Any())
             {
@@ -150,7 +149,7 @@ public static bool operator !=({typeName} a, {typeName} b)
                     fieldText.AppendLine(decorator(field));
                 }
 
-                fieldText.AppendLine($"public readonly {GetFieldTypeAsCsharp(type, field)} {SnakeCaseToPascalCase(field.Name)};");
+                fieldText.AppendLine($"public readonly {FqnFieldType(type, field)} {field.PascalCase()};");
             }
 
             return fieldText.ToString();
