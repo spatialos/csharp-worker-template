@@ -87,20 +87,20 @@ namespace Improbable.Schema.Bundle
 
             Fields = Fields.Where(f =>
             {
-                var allowed = !IsPrimitiveEntityField(f);
+                var isEntityField = IsPrimitiveEntityField(f);
 
-                if (!allowed)
+                if (isEntityField)
                 {
                     warnings.Add($"field '{qualifiedName}.{f.Name}' is the Entity type, which is currently unsupported.");
                 }
 
-                var allowed2 = !IsFieldTypeRecursive(bundle, qualifiedName, f);
-                if (!allowed2)
+                var isRecursiveField = IsFieldTypeRecursive(bundle, qualifiedName, f);
+                if (isRecursiveField)
                 {
                     warnings.Add($"field '{qualifiedName}.{f.Name}' recursively references {qualifiedName}, which is currently unsupported.");
                 }
 
-                return allowed && allowed2;
+                return !isEntityField && !isRecursiveField;
             }).ToList();
 
             Annotations = component != null ? component.Annotations : bundle.Types[qualifiedName].Annotations;

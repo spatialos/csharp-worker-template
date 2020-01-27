@@ -123,11 +123,6 @@ namespace Improbable.Stdlib
                 throw new Exception($"{connection.GetConnectionStatusCode()}: {connection.GetConnectionStatusCodeDetailString()}");
             }
 
-            if (connection.GetConnectionStatusCode() != ConnectionStatusCode.Success)
-            {
-                throw new Exception($"{connection.GetConnectionStatusCode()}: {connection.GetConnectionStatusCodeDetailString()}");
-            }
-
             return new WorkerConnection(connection);
         }
 
@@ -154,11 +149,6 @@ namespace Improbable.Stdlib
             using var locator = new Locator(options.SpatialOsHost, options.SpatialOsPort, locatorParameters);
             using var future = locator.ConnectAsync(connectionParameters);
             var connection = await future.ToTask(cancellation).ConfigureAwait(false);
-
-            if (connection != null && connection.GetConnectionStatusCode() != ConnectionStatusCode.Success)
-            {
-                throw new Exception($"{connection.GetConnectionStatusCode()}: {connection.GetConnectionStatusCodeDetailString()}");
-            }
 
             if (connection != null && connection.GetConnectionStatusCode() != ConnectionStatusCode.Success)
             {

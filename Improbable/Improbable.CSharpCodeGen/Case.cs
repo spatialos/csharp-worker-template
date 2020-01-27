@@ -46,7 +46,7 @@ namespace Improbable.CSharpCodeGen
                 .Take(strings.Length - 1)
                 .Select(SnakeCaseToPascalCase));
         }
-        
+
         public static string Indent(int level, string inputString)
         {
             var indent = string.Empty.PadLeft(level, '\t');

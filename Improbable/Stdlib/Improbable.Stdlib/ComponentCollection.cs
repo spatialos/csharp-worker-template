@@ -141,7 +141,6 @@ namespace Improbable.Stdlib
             freeSlots.Enqueue(index);
             lookup.Remove(entityId);
             return true;
-
         }
 
         private void SetAuthority(EntityId entityId, Authority newAuthority)

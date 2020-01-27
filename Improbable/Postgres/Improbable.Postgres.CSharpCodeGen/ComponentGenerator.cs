@@ -122,7 +122,7 @@ CREATE TRIGGER notify_{{tableName}}_tgr
 
                 FieldType.Singular when f.HasPrimitive(PrimitiveType.String) => "::text",
                 FieldType.Singular when f.HasPrimitive() => string.Empty,
-                FieldType.Singular => throw new InvalidOperationException($"Unsupported schema type '{f.OptionType.InnerType.Type}'. Only primitive types can be converted from Postgres."),
+                FieldType.Singular => throw new InvalidOperationException($"Unsupported schema type '{f.SingularType.Type.Type}'. Only primitive types can be converted from Postgres."),
                 _ => string.Empty
             };
         }
@@ -144,13 +144,13 @@ CREATE TRIGGER notify_{{tableName}}_tgr
 
                         FieldType.List when field.HasEnum() => "integer[] not null",
                         FieldType.List when field.HasPrimitive() => $"{Types.SchemaToPostgresTypes[field.ListType.InnerType.Primitive]}[] not null",
-                        FieldType.List when field.HasCustomType() => throw new Exception($"Unsupported schema type '{field.OptionType.InnerType.Type}'. Compound types are not supported."),
+                        FieldType.List when field.HasCustomType() => throw new Exception($"Unsupported schema type '{field.ListType.InnerType.Type}'. Compound types are not supported."),
 
                         FieldType.Map => throw new InvalidOperationException($"{outerType}.{field.Name}: Maps are not supported."),
 
                         FieldType.Singular when field.HasEnum() => "integer not null",
                         FieldType.Singular when field.HasPrimitive() => $"{Types.SchemaToPostgresTypes[field.SingularType.Type.Primitive]} not null",
-                        FieldType.Singular when field.HasCustomType() => throw new Exception($"Unsupported schema type '{field.OptionType.InnerType.Type}'. Compound types are not supported."),
+                        FieldType.Singular when field.HasCustomType() => throw new Exception($"Unsupported schema type '{field.SingularType.Type.Type}'. Compound types are not supported."),
                         _ => throw new ArgumentOutOfRangeException()
                     };
                 }
