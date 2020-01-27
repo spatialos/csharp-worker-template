@@ -98,10 +98,10 @@ CREATE TRIGGER notify_{{tableName}}_tgr
             var sb = new StringBuilder();
             foreach (var field in fields)
             {
-                var ordinal = $"{SnakeCaseToPascalCase(field.Name)}Ordinal";
+                var ordinal = $"{field.PascalCase()}Ordinal";
                 var toAdd = field.TypeSelector switch
                 {
-                    FieldType.Option => $"reader.IsDBNull({ordinal}) ? null : ({GetFieldTypeAsCsharp(type, field)}) reader.{Types.SchemaToReaderMethod[field.OptionType.InnerType.Primitive]}({ordinal}),",
+                    FieldType.Option => $"reader.IsDBNull({ordinal}) ? null : ({FqnFieldType(type, field)}) reader.{Types.SchemaToReaderMethod[field.OptionType.InnerType.Primitive]}({ordinal}),",
                     FieldType.Singular => $"reader.{Types.SchemaToReaderMethod[field.SingularType.Type.Primitive]}({ordinal}),",
                     _ => throw new ArgumentOutOfRangeException()
                 };
@@ -116,39 +116,15 @@ CREATE TRIGGER notify_{{tableName}}_tgr
         {
             return f.TypeSelector switch
             {
-                case FieldType.Option:
-                    if (f.OptionType.InnerType.ValueTypeSelector == ValueType.Primitive)
-                    {
-                        if (f.OptionType.InnerType.Primitive == PrimitiveType.String)
-                        {
-                            return "::text";
-                        }
-                    }
-                    else
-                    {
-                        throw new InvalidOperationException("Don't know how to convert this type from Postgres");
-                    }
+                FieldType.Option when f.HasPrimitive(PrimitiveType.String) => "::text",
+                FieldType.Option when f.HasPrimitive() => string.Empty,
+                FieldType.Option => throw new InvalidOperationException($"Unsupported schema type '{f.OptionType.InnerType.Type}'. Only primitive types can be converted from Postgres."),
 
-                    break;
-                case FieldType.Singular:
-                    if (f.SingularType.Type.ValueTypeSelector == ValueType.Primitive)
-                    {
-                        if (f.SingularType.Type.Primitive == PrimitiveType.String)
-                        {
-                            return "::text";
-                        }
-                    }
-                    else
-                    {
-                        throw new InvalidOperationException("Don't know how to convert this type from Postgres");
-                    }
-
-                    break;
-                default:
-                    return string.Empty;
-            }
-
-            return string.Empty;
+                FieldType.Singular when f.HasPrimitive(PrimitiveType.String) => "::text",
+                FieldType.Singular when f.HasPrimitive() => string.Empty,
+                FieldType.Singular => throw new InvalidOperationException($"Unsupported schema type '{f.SingularType.Type.Type}'. Only primitive types can be converted from Postgres."),
+                _ => string.Empty
+            };
         }
 
         private static string CreateColumns(string outerType, IEnumerable<FieldDefinition> fields)
@@ -162,45 +138,21 @@ CREATE TRIGGER notify_{{tableName}}_tgr
                 {
                     databaseType = field.TypeSelector switch
                     {
-                        case FieldType.Option:
-                            databaseType = field.OptionType.InnerType.ValueTypeSelector switch
-                            {
-                                ValueType.Enum => "integer",
-                                ValueType.Primitive => Types.SchemaToPostgresTypes[field.OptionType.InnerType.Primitive],
-                                ValueType.Type => throw new Exception("Compound types are not supported"),
-                                _ => throw new ArgumentOutOfRangeException()
-                            };
+                        FieldType.Option when field.HasEnum() => "integer",
+                        FieldType.Option when field.HasPrimitive() => Types.SchemaToPostgresTypes[field.OptionType.InnerType.Primitive],
+                        FieldType.Option when field.HasCustomType() => throw new Exception($"Unsupported schema type '{field.OptionType.InnerType.Type}'. Compound types are not supported."),
 
-                            break;
+                        FieldType.List when field.HasEnum() => "integer[] not null",
+                        FieldType.List when field.HasPrimitive() => $"{Types.SchemaToPostgresTypes[field.ListType.InnerType.Primitive]}[] not null",
+                        FieldType.List when field.HasCustomType() => throw new Exception($"Unsupported schema type '{field.ListType.InnerType.Type}'. Compound types are not supported."),
 
-                        case FieldType.List:
-                            databaseType = field.ListType.InnerType.ValueTypeSelector switch
-                            {
-                                ValueType.Enum => "integer[] not null",
-                                ValueType.Primitive => $"{Types.SchemaToPostgresTypes[field.ListType.InnerType.Primitive]}[] not null",
-                                ValueType.Type => throw new Exception("Compound types are not supported"),
-                                _ => throw new ArgumentOutOfRangeException()
-                            };
+                        FieldType.Map => throw new InvalidOperationException($"{outerType}.{field.Name}: Maps are not supported."),
 
-                            break;
-
-                        case FieldType.Map:
-                            throw new InvalidOperationException($"{outerType}.{field.Name}: Maps are not supported.");
-
-                        case FieldType.Singular:
-                            databaseType = field.SingularType.Type.ValueTypeSelector switch
-                            {
-                                ValueType.Enum => "integer",
-                                ValueType.Primitive => Types.SchemaToPostgresTypes[field.SingularType.Type.Primitive],
-                                ValueType.Type => throw new Exception("Compound types are not supported"),
-                                _ => throw new ArgumentOutOfRangeException()
-                            };
-
-                            databaseType += " not null";
-                            break;
-                        default:
-                            throw new ArgumentOutOfRangeException();
-                    }
+                        FieldType.Singular when field.HasEnum() => "integer not null",
+                        FieldType.Singular when field.HasPrimitive() => $"{Types.SchemaToPostgresTypes[field.SingularType.Type.Primitive]} not null",
+                        FieldType.Singular when field.HasCustomType() => throw new Exception($"Unsupported schema type '{field.SingularType.Type.Type}'. Compound types are not supported."),
+                        _ => throw new ArgumentOutOfRangeException()
+                    };
                 }
 
                 databaseType = databaseType.Replace("{fieldName}", SnakeCaseToPascalCase(field.Name));
