@@ -103,7 +103,6 @@ namespace Improbable.Schema.Bundle
             return f.TypeSelector switch
             {
                 FieldType.Map => (f.MapType.KeyType.HasPrimitive(PrimitiveType.Entity) || f.MapType.ValueType.HasPrimitive(PrimitiveType.Entity)),
-                FieldType.Option => (f.OptionType.InnerType.ValueTypeSelector == ValueType.Primitive && f.OptionType.InnerType.Primitive == PrimitiveType.Entity),
                 _ => f.HasPrimitive(PrimitiveType.Entity)
             };
         }

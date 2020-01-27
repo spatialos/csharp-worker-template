@@ -189,7 +189,7 @@ namespace Improbable.Postgres
         {
             foreach (var key in keys)
             {
-                var value = "";
+                var value = string.Empty;
                 if (!opList.TryGetWorkerFlagChange(key, ref value))
                 {
                     continue;

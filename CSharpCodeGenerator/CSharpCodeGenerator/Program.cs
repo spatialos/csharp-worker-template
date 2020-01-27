@@ -53,7 +53,6 @@ namespace CSharpCodeGenerator
 
         private static void Run(Options options)
         {
-
             Log.Information(Parser.Default.FormatCommandLine(options));
 
             var timer = new Stopwatch();

@@ -148,7 +148,7 @@ namespace Improbable.Stdlib
 
             using var locator = new Locator(options.SpatialOsHost, options.SpatialOsPort, locatorParameters);
             using var future = locator.ConnectAsync(connectionParameters);
-            var connection = await future.ToTask(cancellation).ConfigureAwait(false); ;
+            var connection = await future.ToTask(cancellation).ConfigureAwait(false);
 
             if (connection == null)
             {
