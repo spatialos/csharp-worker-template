@@ -1,6 +1,4 @@
-using System;
 using System.Collections.Generic;
-using System.Linq;
 using Improbable.Worker.CInterop;
 
 namespace Improbable.Stdlib
@@ -16,7 +14,7 @@ namespace Improbable.Stdlib
     {
         public delegate TComponent CreateDelegate(SchemaComponentData? data);
 
-        public delegate TComponent UpdateDelegate(TComponent original, SchemaComponentUpdate? update);
+        public delegate TComponent UpdateDelegate(in TComponent original, SchemaComponentUpdate? update);
 
         private readonly HashSet<EntityId> authority = new HashSet<EntityId>();
         private readonly uint componentId;
@@ -135,14 +133,14 @@ namespace Improbable.Stdlib
 
         public bool Remove(EntityId entityId)
         {
-            if (lookup.TryGetValue(entityId, out var index))
+            if (!lookup.TryGetValue(entityId, out var index))
             {
-                freeSlots.Enqueue(index);
-                lookup.Remove(entityId);
-                return true;
+                return false;
             }
 
-            return false;
+            freeSlots.Enqueue(index);
+            lookup.Remove(entityId);
+            return true;
         }
 
         private void SetAuthority(EntityId entityId, Authority newAuthority)

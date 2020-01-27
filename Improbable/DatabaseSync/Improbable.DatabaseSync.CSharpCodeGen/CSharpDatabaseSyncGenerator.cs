@@ -6,7 +6,6 @@ using Improbable.Schema.Bundle;
 using static Improbable.DatabaseSync.CSharpCodeGen.WellKnownAnnotations;
 using static Improbable.CSharpCodeGen.Case;
 using static Improbable.CSharpCodeGen.Types;
-using ValueType = Improbable.Schema.Bundle.ValueType;
 
 namespace Improbable.DatabaseSync.CSharpCodeGen
 {
@@ -34,7 +33,7 @@ namespace Improbable.DatabaseSync.CSharpCodeGen
             }
 
             var profileIdField = profileIdFields[0];
-            if (profileIdField.TypeSelector != FieldType.Singular || profileIdField.SingularType.Type.ValueTypeSelector != ValueType.Primitive || profileIdField.SingularType.Type.Primitive != PrimitiveType.String)
+            if (!profileIdField.IsSingular() || !profileIdField.HasPrimitive(PrimitiveType.String))
             {
                 throw new InvalidOperationException($"{profileIdField.Name} is annotated with {ProfileIdAnnotation}, which requires it to be a string type.");
             }
@@ -84,7 +83,7 @@ public static string GetProfileIdFromComponentData(global::Improbable.Worker.CIn
     return fields.GetString({profileIdField.FieldId});
 }}
 
-public static string ComponentToDatabase(string databaseName, in global::{CapitalizeNamespace(type.QualifiedName)} item)
+public static string ComponentToDatabase(string databaseName, in {type.Fqn()} item)
 {{
     if (string.IsNullOrEmpty(item.{profileFieldName}))
     {{

@@ -10,11 +10,10 @@ using Improbable.Schema.Bundle;
 using Improbable.Stdlib.CSharpCodeGen;
 using Improbable.WorkerSdkInterop.CSharpCodeGen;
 using Serilog;
-using Serilog.Core;
 using static Improbable.CSharpCodeGen.Case;
 using Types = Improbable.CSharpCodeGen.Types;
 
-namespace CodeGenerator
+namespace CSharpCodeGenerator
 {
     public class Options
     {
@@ -54,7 +53,6 @@ namespace CodeGenerator
 
         private static void Run(Options options)
         {
-            
             Log.Information(Parser.Default.FormatCommandLine(options));
 
             var timer = new Stopwatch();
@@ -89,7 +87,7 @@ namespace CodeGenerator
                 {
                     baseGenerator,
                     new StdlibGenerator(bundle),
-                    new SchemaObjectGenerator(bundle),
+                    new SchemaObjectGenerator(bundle)
                 };
 
                 var allContent = new Dictionary<string, StringBuilder>();
@@ -110,19 +108,13 @@ namespace CodeGenerator
                     builder.AppendJoin(Environment.NewLine, generators.Select(g =>
                     {
                         var result = g.Generate(t).TrimEnd();
-                        if (string.IsNullOrWhiteSpace(result))
-                        {
-                            return string.Empty;
-                        }
-
-                        return $@"
+                        return string.IsNullOrWhiteSpace(result) ? string.Empty : $@"
 #region {g.GetType().FullName}
 
 {result}
 
 #endregion {g.GetType().FullName}
 ";
-
                     }).Where(s => !string.IsNullOrEmpty(s)));
 
                     // Nested types.
@@ -138,7 +130,7 @@ namespace CodeGenerator
                     var content = allContent[t.QualifiedName];
 
                     WriteFile(options, Types.TypeToFilename(t.QualifiedName), $@"
-namespace {GetPascalCaseNamespaceFromTypeName(t.QualifiedName)}
+namespace {t.Namespace()}
 {{
 {Indent(1, GenerateType(t, content.ToString().TrimEnd(), bundle))}
 }}");
@@ -148,7 +140,7 @@ namespace {GetPascalCaseNamespaceFromTypeName(t.QualifiedName)}
                 foreach (var (key, value) in bundle.Enums.Where(type => !nestedTypes.Contains(type.Key)))
                 {
                     WriteFile(options, Types.TypeToFilename(key), $@"
-namespace {GetPascalCaseNamespaceFromTypeName(key)}
+namespace {value.Namespace()}
 {{
 {Indent(1, GenerateEnum(value, bundle))}
 }}");
@@ -190,7 +182,7 @@ namespace {GetPascalCaseNamespaceFromTypeName(key)}
             var values = new StringBuilder();
             foreach (var v in enumDef.Values)
             {
-                values.AppendLine($"{AllCapsSnakeCaseToPascalCase(v.Name)} = {v.Value},");
+                values.AppendLine($"{v.Name()} = {v.Value},");
             }
 
             return $@"// Generated from {bundle.TypeToFile[enumDef.QualifiedName].CanonicalPath}({enumDef.SourceReference.Line},{enumDef.SourceReference.Column})
@@ -202,11 +194,8 @@ public enum {enumDef.Name}
 
         private static string GenerateType(TypeDescription type, string content, Bundle bundle)
         {
-            var typeName = GetPascalCaseNameFromTypeName(type.QualifiedName);
-
-
             return $@"// Generated from {bundle.TypeToFile[type.QualifiedName].CanonicalPath}({type.SourceReference.Line},{type.SourceReference.Column})
-public readonly struct {typeName} : global::System.IEquatable<{typeName}>
+public readonly struct {type.TypeName()} : global::System.IEquatable<{type.TypeName()}>
 {{
 {Indent(1, content)}
 }}";

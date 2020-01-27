@@ -17,11 +17,13 @@ namespace Improbable.Stdlib
                 {
                     cancellation.ThrowIfCancellationRequested();
 
-                    if (future.TryGet(out var value, 50))
+                    if (!future.TryGet(out var value, 50))
                     {
-                        tcs.TrySetResult(value);
-                        break;
+                        continue;
                     }
+
+                    tcs.TrySetResult(value);
+                    break;
                 }
             }, cancellation);
 

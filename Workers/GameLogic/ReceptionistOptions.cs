@@ -5,7 +5,7 @@ using Improbable.Stdlib;
 namespace GameLogic
 {
     [Verb("receptionist", HelpText = "Connect to a deployment using the receptionist")]
-    internal class ReceptionistOptions : IWorkerOptions, IReceptionistOptions
+    internal class ReceptionistOptions : IReceptionistOptions
     {
         public string WorkerName { get; set; }
         public string LogFileName { get; set; }
@@ -13,6 +13,5 @@ namespace GameLogic
         public IEnumerable<string> UnknownPositionalArguments { get; set; }
         public string SpatialOsHost { get; set; }
         public ushort SpatialOsPort { get; set; }
-        public string DeploymentName { get; set; }
     }
 }

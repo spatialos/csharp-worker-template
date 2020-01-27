@@ -1,3 +1,4 @@
+using System.Linq;
 using Improbable.Worker.CInterop;
 
 namespace Improbable.Stdlib
@@ -7,13 +8,10 @@ namespace Improbable.Stdlib
         public static bool TryGetWorkerFlagChange(this OpList opList, string flagName, ref string newValue)
         {
             var found = false;
-            foreach (var op in opList.OfOpType<FlagUpdateOp>())
+            foreach (var op in opList.OfOpType<FlagUpdateOp>().Where(op => op.Name == flagName))
             {
-                if (op.Name == flagName)
-                {
-                    newValue = op.Value;
-                    found = true;
-                }
+                newValue = op.Value;
+                found = true;
             }
 
             return found;

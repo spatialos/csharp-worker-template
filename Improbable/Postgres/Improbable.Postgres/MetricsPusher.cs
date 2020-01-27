@@ -40,19 +40,15 @@ namespace Improbable.Postgres
 
             try
             {
-                using (var connection = new ConnectionWrapper(postgresOptions.ConnectionString))
+                using var connection = new ConnectionWrapper(postgresOptions.ConnectionString);
+                foreach (var (key, value) in currentCounts.Concat(currentTimings))
                 {
-                    foreach (var metrics in currentCounts.Concat(currentTimings))
-                    {
-                        using (var cmd = connection.Command("INSERT INTO metrics (time, name, value) VALUES (@time, @name, @value);"))
-                        {
-                            cmd.Command.Parameters.AddWithValue("time", NpgsqlDbType.Timestamp, observationTime);
-                            cmd.Command.Parameters.AddWithValue("name", NpgsqlDbType.Varchar, metrics.Key);
-                            cmd.Command.Parameters.AddWithValue("value", NpgsqlDbType.Integer, metrics.Value);
-                            cmd.Command.Prepare();
-                            cmd.Command.ExecuteNonQuery();
-                        }
-                    }
+                    using var cmd = connection.Command("INSERT INTO metrics (time, name, value) VALUES (@time, @name, @value);");
+                    cmd.Command.Parameters.AddWithValue("time", NpgsqlDbType.Timestamp, observationTime);
+                    cmd.Command.Parameters.AddWithValue("name", NpgsqlDbType.Varchar, key);
+                    cmd.Command.Parameters.AddWithValue("value", NpgsqlDbType.Integer, value);
+                    cmd.Command.Prepare();
+                    cmd.Command.ExecuteNonQuery();
                 }
             }
             catch (Exception e)

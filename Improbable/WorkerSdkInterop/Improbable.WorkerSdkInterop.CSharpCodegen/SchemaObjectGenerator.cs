@@ -6,6 +6,7 @@ using Improbable.CSharpCodeGen;
 using Improbable.Schema.Bundle;
 using static Improbable.CSharpCodeGen.Case;
 using static Improbable.CSharpCodeGen.Types;
+using FieldType = Improbable.Schema.Bundle.FieldType;
 using ValueType = Improbable.Schema.Bundle.ValueType;
 
 namespace Improbable.WorkerSdkInterop.CSharpCodeGen
@@ -21,27 +22,25 @@ namespace Improbable.WorkerSdkInterop.CSharpCodeGen
 
         public string Generate(TypeDescription type)
         {
-            var typeName = GetPascalCaseNameFromTypeName(type.QualifiedName);
+            var typeName = type.TypeName();
 
             var content = new StringBuilder();
             var commandTypes = bundle.CommandTypes;
 
-            var filteredFields = type.Fields.Where(f => !IsFieldTypeRecursive(bundle, type.QualifiedName, f)).ToList();
-
-            content.AppendLine(GenerateSchemaConstructor(type, filteredFields, bundle).TrimEnd());
-            content.AppendLine(GenerateApplyToSchemaObject(filteredFields).TrimEnd());
-            content.AppendLine(GenerateUpdaters(filteredFields).TrimEnd());
-            content.AppendLine(GenerateSchemaConstructor(type, filteredFields));
+            content.AppendLine(GenerateSchemaConstructor(type, type.Fields).TrimEnd());
+            content.AppendLine(GenerateApplyToSchemaObject(type.Fields).TrimEnd());
+            content.AppendLine(GenerateUpdaters(type.Fields).TrimEnd());
+            content.AppendLine(GenerateConstructor(type, type.Fields).TrimEnd());
 
             if (type.ComponentId.HasValue)
             {
-                content.AppendLine(GenerateFromUpdate(type, type.ComponentId.Value, bundle).TrimEnd());
+                content.AppendLine(GenerateFromUpdate(type).TrimEnd());
                 content.AppendLine(GenerateCreateGetEvents(type.Events).TrimEnd());
 
                 if (!type.IsRestricted)
                 {
                     // Workers can't construct or send updates for restricted components.
-                    content.AppendLine(GenerateUpdateStruct(type, filteredFields));
+                    content.AppendLine(GenerateUpdateStruct(type, type.Fields).TrimEnd());
                 }
             }
 
@@ -56,18 +55,16 @@ namespace Improbable.WorkerSdkInterop.CSharpCodeGen
             return content.ToString();
         }
 
-        private static string GenerateSchemaConstructor(TypeDescription type, IReadOnlyList<FieldDefinition> fields, Bundle bundle)
+        private static string GenerateSchemaConstructor(TypeDescription type, IEnumerable<FieldDefinition> fields)
         {
-            var typeName = GetPascalCaseNameFromTypeName(type.QualifiedName);
+            var typeName = type.TypeName();
 
             var text = new StringBuilder();
             var sb = new StringBuilder();
 
             foreach (var field in fields)
             {
-                var fieldName = SnakeCaseToPascalCase(field.Name);
-
-                var output = GetAssignmentForField(type, field, fieldName, bundle);
+                var output = GetAssignmentForField(type, field, field.PascalCase());
                 sb.AppendLine(output);
             }
 
@@ -80,176 +77,64 @@ internal {typeName}(global::Improbable.Worker.CInterop.SchemaObject fields)
             return text.ToString();
         }
 
-        private static string GenerateApplyToSchemaObject(IReadOnlyList<FieldDefinition> fields)
+        private static string GetApplyMapObject(TypeReference type, string mapObjectFieldId)
+        {
+            var value = mapObjectFieldId switch
+            {
+                SchemaMapKeyFieldId => "kv.Key",
+                SchemaMapValueFieldId => "kv.Value",
+                _ => throw new ArgumentException(nameof(mapObjectFieldId))
+            };
+
+            return type.ValueTypeSelector switch
+            {
+                ValueType.Enum => $"kvPair.AddEnum({mapObjectFieldId}, (uint) {value});",
+                ValueType.Primitive when type.Primitive == PrimitiveType.EntityId => $"kvPair.Add{type.Primitive}({mapObjectFieldId}, {value}.Value);",
+                ValueType.Primitive => $"kvPair.Add{type.Primitive}({mapObjectFieldId}, {value});",
+                ValueType.Type => $"{value}.ApplyToSchemaObject(kvPair.AddObject({mapObjectFieldId}));",
+                _ => throw new ArgumentOutOfRangeException()
+            };
+        }
+
+        private static string GetApplyToSchemaObjectValueStatement(FieldDefinition field, string variableName)
+        {
+            var fieldAddMethod = GetFieldAddMethod(field);
+
+            if (field.HasCustomType())
+            {
+                var value = field.IsOption() ? ".Value" : string.Empty;
+                return $"{variableName}{value}.ApplyToSchemaObject(fields.{fieldAddMethod}({field.FieldId}));";
+            }
+
+            return $"fields.{fieldAddMethod}({field.FieldId}, {GetValueAccessor(field, variableName)});";
+        }
+
+        private static string GenerateApplyToSchemaObject(IEnumerable<FieldDefinition> fields)
         {
             var update = new StringBuilder();
 
             foreach (var field in fields)
             {
-                var fieldName = SnakeCaseToPascalCase(field.Name);
-                var fieldAddMethod = GetFieldAddMethod(field);
+                var fieldName = field.PascalCase();
 
-                string output;
-                switch (field.TypeSelector)
+                var output = field.TypeSelector switch
                 {
-                    case FieldType.Option:
-                        switch (field.OptionType.InnerType.ValueTypeSelector)
-                        {
-                            case ValueType.Enum:
-                                output = $"if ({fieldName}.HasValue) {{ fields.{fieldAddMethod}({field.FieldId}, (uint){fieldName}.Value); }}";
-                                break;
-                            case ValueType.Primitive:
-                                switch (field.OptionType.InnerType.Primitive)
-                                {
-                                    case PrimitiveType.Bytes:
-                                    case PrimitiveType.String:
-                                        output = $"if ({fieldName} != null ) {{ fields.{fieldAddMethod}({field.FieldId}, {fieldName}); }}";
-                                        break;
-                                    case PrimitiveType.EntityId:
-                                        output = $"if ({fieldName}.HasValue) {{ fields.{fieldAddMethod}({field.FieldId}, {fieldName}.Value.Value); }}";
-                                        break;
-                                    default:
-                                        output = $"if ({fieldName}.HasValue) {{ fields.{fieldAddMethod}({field.FieldId}, {fieldName}.Value); }}";
-                                        break;
-                                }
+                    FieldType.Option => $"if ({fieldName}{field.OptionValueTest()}) {{ {GetApplyToSchemaObjectValueStatement(field, fieldName)} }}",
 
-                                break;
-                            case ValueType.Type:
-                                output = $"if ({fieldName}.HasValue) {{ {fieldName}.Value.ApplyToSchemaObject(fields.{fieldAddMethod}({field.FieldId})); }}";
-                                break;
-                            default:
-                                throw new ArgumentOutOfRangeException();
-                        }
-
-                        break;
-                    case FieldType.List:
-                        string addType;
-                        switch (field.ListType.InnerType.ValueTypeSelector)
-                        {
-                            case ValueType.Enum:
-                                addType = $"fields.AddEnum({field.FieldId}, (uint)value);";
-                                break;
-                            case ValueType.Primitive:
-                                switch (field.ListType.InnerType.Primitive)
-                                {
-                                    case PrimitiveType.EntityId:
-                                        addType = $"fields.Add{field.ListType.InnerType.Primitive}({field.FieldId}, value.Value);";
-                                        break;
-                                    default:
-                                        addType = $"fields.Add{field.ListType.InnerType.Primitive}({field.FieldId}, value);";
-                                        break;
-                                }
-
-                                break;
-                            case ValueType.Type:
-                                addType = $"value.ApplyToSchemaObject(fields.AddObject({field.FieldId}));";
-                                break;
-                            default:
-                                throw new ArgumentOutOfRangeException();
-                        }
-
-                        output =
-                            $@"if ( {fieldName} != null)
+                    FieldType.List => $@"foreach(var value in {fieldName})
 {{
-    foreach(var value in {fieldName})
-    {{
-        {addType}
-    }}
-}}";
+        {GetApplyToSchemaObjectValueStatement(field, "value")}
+}}",
 
-                        break;
-                    case FieldType.Map:
-                        string setKeyType;
-                        string setValueType;
-
-                        switch (field.MapType.KeyType.ValueTypeSelector)
-                        {
-                            case ValueType.Enum:
-                                setKeyType = "kvPair.AddEnum(global::Improbable.Worker.CInterop.SchemaObject.SchemaMapKeyFieldId, (uint)kv.Key);";
-                                break;
-                            case ValueType.Primitive:
-                                switch (field.MapType.KeyType.Primitive)
-                                {
-                                    case PrimitiveType.EntityId:
-                                        setKeyType = $"kvPair.Add{field.MapType.KeyType.Primitive}(global::Improbable.Worker.CInterop.SchemaObject.SchemaMapKeyFieldId, kv.Key.Value);";
-                                        break;
-                                    default:
-                                        setKeyType = $"kvPair.Add{field.MapType.KeyType.Primitive}(global::Improbable.Worker.CInterop.SchemaObject.SchemaMapKeyFieldId, kv.Key);";
-                                        break;
-                                }
-
-                                break;
-                            case ValueType.Type:
-                                setKeyType = "kv.Key.ApplyToSchemaObject(kvPair.AddObject(global::Improbable.Worker.CInterop.SchemaObject.SchemaMapKeyFieldId));";
-                                break;
-                            default:
-                                throw new ArgumentOutOfRangeException();
-                        }
-
-                        switch (field.MapType.ValueType.ValueTypeSelector)
-                        {
-                            case ValueType.Enum:
-                                setValueType = "kvPair.AddEnum(global::Improbable.Worker.CInterop.SchemaObject.SchemaMapValueFieldId, (uint)kv.Value);";
-                                break;
-                            case ValueType.Primitive:
-                                switch (field.MapType.ValueType.Primitive)
-                                {
-                                    case PrimitiveType.EntityId:
-                                        setValueType = $"kvPair.Add{field.MapType.ValueType.Primitive}(global::Improbable.Worker.CInterop.SchemaObject.SchemaMapValueFieldId, kv.Value.Value);";
-                                        break;
-                                    default:
-                                        setValueType = $"kvPair.Add{field.MapType.ValueType.Primitive}(global::Improbable.Worker.CInterop.SchemaObject.SchemaMapValueFieldId, kv.Value);";
-                                        break;
-                                }
-
-                                break;
-                            case ValueType.Type:
-                                setValueType = "kv.Value.ApplyToSchemaObject(kvPair.AddObject(global::Improbable.Worker.CInterop.SchemaObject.SchemaMapValueFieldId));";
-                                break;
-                            default:
-                                throw new ArgumentOutOfRangeException();
-                        }
-
-                        output =
-                            $@"if ( {fieldName} != null)
+                    FieldType.Map => $@"foreach(var kv in {fieldName})
 {{
-    foreach(var kv in {fieldName})
-    {{
         var kvPair = fields.AddObject({field.FieldId});
-        {setKeyType}
-        {setValueType}
-    }}
-}}";
-                        break;
-                    case FieldType.Singular:
-                        switch (field.SingularType.Type.ValueTypeSelector)
-                        {
-                            case ValueType.Enum:
-                                output = $"fields.{fieldAddMethod}({field.FieldId}, (uint) {fieldName});";
-                                break;
-                            case ValueType.Primitive:
-                                switch (field.SingularType.Type.Primitive)
-                                {
-                                    case PrimitiveType.EntityId:
-                                        output = $"fields.{fieldAddMethod}({field.FieldId}, {fieldName}.Value);";
-                                        break;
-                                    default:
-                                        output = $"fields.{fieldAddMethod}({field.FieldId}, {fieldName});";
-                                        break;
-                                }
-
-                                break;
-                            case ValueType.Type:
-                                output = $"{fieldName}.ApplyToSchemaObject(fields.{fieldAddMethod}({field.FieldId}));";
-                                break;
-                            default:
-                                throw new ArgumentOutOfRangeException();
-                        }
-
-                        break;
-                    default:
-                        throw new ArgumentOutOfRangeException();
-                }
+        {GetApplyMapObject(field.MapType.KeyType, SchemaMapKeyFieldId)}
+        {GetApplyMapObject(field.MapType.ValueType, SchemaMapValueFieldId)}
+}}",
+                    FieldType.Singular => $"{GetApplyToSchemaObjectValueStatement(field, fieldName)}",
+                    _ => throw new ArgumentOutOfRangeException()
+                };
 
                 update.AppendLine(output);
             }
@@ -261,284 +146,145 @@ internal void ApplyToSchemaObject(global::Improbable.Worker.CInterop.SchemaObjec
 }}";
         }
 
-        private static string GetAssignmentForField(TypeDescription type, FieldDefinition field, string fieldName, Bundle bundle)
+
+        private static string GetMapObjectAssignment(TypeReference type, string fieldId)
         {
-            var fieldAccessor = GetFieldGetMethod(field);
-            var fieldCount = GetFieldCountMethod(field);
-            string output;
+            var pairValue = $"kvPair.{GetTypeReferenceGetter(type)}({fieldId})";
 
-            switch (field.TypeSelector)
+            return type.ValueTypeSelector switch
             {
-                case FieldType.Option:
-                    switch (field.OptionType.InnerType.ValueTypeSelector)
-                    {
-                        case ValueType.Enum:
-                            output = $"{fieldName} = ({CapitalizeNamespace(field.OptionType.InnerType.Enum)})fields.{fieldAccessor}({field.FieldId});";
-                            break;
-                        case ValueType.Primitive:
-                            output = $"{fieldName} = fields.{fieldAccessor}({field.FieldId});";
-                            break;
-                        case ValueType.Type:
-                            var objectType = CapitalizeNamespace(field.OptionType.InnerType.Type);
-                            output =
-                                $@"{fieldName} = new {objectType}(fields.{fieldAccessor}({field.FieldId}));";
-                            break;
-                        default:
-                            throw new ArgumentOutOfRangeException();
-                    }
-
-                    output = $@"if (fields.GetObjectCount({field.FieldId}) > 0)
-{{
-    {output}
-}}
-else
-{{
-    {fieldName} = null;
-}}";
-
-                    output = $@"if (fields.GetObjectCount({field.FieldId}) > 0)
-{{
-    {output}
-}}
-else
-{{
-    {fieldName} = null;
-}}";
-                    break;
-                case FieldType.List:
-                    switch (field.ListType.InnerType.ValueTypeSelector)
-                    {
-                        case ValueType.Enum:
-                            var name = CapitalizeNamespace(field.ListType.InnerType.Enum);
-                            output =
-                                $@"{{
-    var elements = fields.{fieldAccessor}({field.FieldId});
-    {fieldName} = global::System.Collections.Immutable.ImmutableArray<{name}>.Empty;
-    for (uint i = 0; i < elements.Length; i++)
-    {{
-        {fieldName} = {fieldName}.Add(({name}) elements[i]);
-    }}
-}}";
-                            break;
-                        case ValueType.Primitive:
-                            switch (field.ListType.InnerType.Primitive)
-                            {
-                                case PrimitiveType.Bytes:
-                                    output =
-                                        $@"{{
-    var count = fields.GetBytesCount({field.FieldId});
-    {fieldName} = global::System.Collections.Immutable.ImmutableArray<byte[]>.Empty;
-    for (uint i = 0; i < count; i++)
-    {{
-        {fieldName} = {fieldName}.Add(fields.IndexBytes({field.FieldId}, i));
-    }}
-}}";
-                                    break;
-                                case PrimitiveType.String:
-                                    output =
-                                        $@"{{
-    var count = fields.GetStringCount({field.FieldId});
-    {fieldName} = global::System.Collections.Immutable.ImmutableArray<string>.Empty;
-
-    for (uint i = 0; i < count; i++)
-    {{
-        {fieldName} = {fieldName}.Add(fields.IndexString({field.FieldId}, i));
-    }}
-}}";
-                                    break;
-                                case PrimitiveType.EntityId:
-                                    output =
-                                        $@"{{
-    var count = fields.GetEntityIdCount({field.FieldId});
-    {fieldName} = global::System.Collections.Immutable.ImmutableArray<{EntityIdType}>.Empty;
-
-    for (uint i = 0; i < count; i++)
-    {{
-        {fieldName} = {fieldName}.Add(new {EntityIdType}(fields.IndexEntityId({field.FieldId}, i)));
-    }}
-}}";
-                                    break;
-                                default:
-                                    output = $"{fieldName} = {GetEmptyFieldInstantiationAsCsharp(type, field)}.AddRange(fields.{fieldAccessor}({field.FieldId}));";
-                                    break;
-                            }
-
-                            break;
-                        case ValueType.Type:
-                            var typeName = CapitalizeNamespace(field.ListType.InnerType.Type);
-                            if (IsFieldRecursive(type, field))
-                            {
-                                output =
-                                    $@"var local{fieldName} = {GetEmptyFieldInstantiationAsCsharp(type, field)};
-{fieldName} = local{fieldName};
-
-for(uint i = 0; i < fields.{fieldCount}({field.FieldId}); i++)
-{{
-    local{fieldName}.Add(new {typeName}(fields.{fieldAccessor}({field.FieldId}, i)));
-}}";
-                            }
-                            else
-                            {
-                                output =
-                                    $@"
-{fieldName} = {GetEmptyFieldInstantiationAsCsharp(type, field)};
-for(uint i = 0; i < fields.{fieldCount}({field.FieldId}); i++)
-{{
-    {fieldName} = {fieldName}.Add(new {typeName}(fields.{fieldAccessor}({field.FieldId}, i)));
-}}";
-                            }
-
-                            break;
-                        default:
-                            throw new ArgumentOutOfRangeException();
-                    }
-
-                    break;
-                case FieldType.Map:
-                    string getKeyType;
-                    string getValueType;
-
-                    switch (field.MapType.KeyType.ValueTypeSelector)
-                    {
-                        case ValueType.Enum:
-                            getKeyType = $"({CapitalizeNamespace(field.MapType.KeyType.Enum)}) kvPair.GetEnum(global::Improbable.Worker.CInterop.SchemaObject.SchemaMapKeyFieldId)";
-                            break;
-                        case ValueType.Primitive:
-                            getKeyType = $"kvPair.Get{field.MapType.KeyType.Primitive}(global::Improbable.Worker.CInterop.SchemaObject.SchemaMapKeyFieldId)";
-                            break;
-                        case ValueType.Type:
-                            getKeyType = $"new {CapitalizeNamespace(field.MapType.KeyType.Type)}(kvPair.GetObject(global::Improbable.Worker.CInterop.SchemaObject.SchemaMapKeyFieldId))";
-                            break;
-                        default:
-                            throw new ArgumentOutOfRangeException();
-                    }
-
-                    switch (field.MapType.ValueType.ValueTypeSelector)
-                    {
-                        case ValueType.Enum:
-                            getValueType = $"({CapitalizeNamespace(field.MapType.ValueType.Enum)}) kvPair.GetEnum(global::Improbable.Worker.CInterop.SchemaObject.SchemaMapValueFieldId)";
-                            break;
-                        case ValueType.Primitive:
-                            getValueType = $"kvPair.Get{field.MapType.ValueType.Primitive}(global::Improbable.Worker.CInterop.SchemaObject.SchemaMapValueFieldId)";
-                            break;
-                        case ValueType.Type:
-                            getValueType = $"new {CapitalizeNamespace(field.MapType.ValueType.Type)}(kvPair.GetObject(global::Improbable.Worker.CInterop.SchemaObject.SchemaMapValueFieldId))";
-                            break;
-                        default:
-                            throw new ArgumentOutOfRangeException();
-                    }
-
-                    if (IsFieldRecursive(type, field))
-                    {
-                        output =
-                            $@"var local{fieldName} = {GetEmptyFieldInstantiationAsCsharp(type, field)};
-{fieldName} = local{fieldName};
-
-for(uint i = 0; i < fields.{fieldCount}({field.FieldId}); i++)
-{{
-    var kvPair = fields.IndexObject({field.FieldId}, i);
-    local{fieldName}.Add({getKeyType}, {getValueType});
-}}";
-                    }
-                    else
-                    {
-                        output =
-                            $@"{fieldName} = {GetEmptyFieldInstantiationAsCsharp(type, field)};
-
-for(uint i = 0; i < fields.{fieldCount}({field.FieldId}); i++)
-{{
-    var kvPair = fields.IndexObject({field.FieldId}, i);
-    {fieldName} = {fieldName}.Add({getKeyType}, {getValueType});
-}}";
-                    }
-
-                    break;
-                case FieldType.Singular:
-                    switch (field.SingularType.Type.ValueTypeSelector)
-                    {
-                        case ValueType.Enum:
-                            output = $"{fieldName} = ({CapitalizeNamespace(field.SingularType.Type.Enum)})fields.{fieldAccessor}({field.FieldId});";
-                            break;
-                        case ValueType.Primitive:
-                            switch (field.SingularType.Type.Primitive)
-                            {
-                                case PrimitiveType.Bytes:
-                                    output = $"{fieldName} = ({SchemaToCSharpTypes[field.SingularType.Type.Primitive]}) fields.{fieldAccessor}({field.FieldId}).Clone();";
-                                    break;
-                                default:
-                                    output = $"{fieldName} = fields.{fieldAccessor}({field.FieldId});";
-                                    break;
-                            }
-
-                            break;
-                        case ValueType.Type:
-                            var objectType = CapitalizeNamespace(field.SingularType.Type.Type);
-                            output = $"{fieldName} = new {objectType}(fields.{fieldAccessor}({field.FieldId}));";
-                            break;
-                        default:
-                            throw new ArgumentOutOfRangeException();
-                    }
-
-                    break;
-                default:
-                    throw new ArgumentOutOfRangeException();
-            }
-
-            return output;
+                // (EnumType) (value)
+                ValueType.Enum => $"({type.Fqn()}) {pairValue}",
+                // value
+                ValueType.Primitive => pairValue,
+                // new Type(value)
+                ValueType.Type => $"new {type.Fqn()}({pairValue})",
+                _ => throw new ArgumentOutOfRangeException()
+            };
         }
 
-        private static string GenerateFromUpdate(TypeDescription type, uint componentId, Bundle bundle)
+        private static string GetAssignmentInstantiation(FieldDefinition field)
         {
-            var typeName = GetPascalCaseNameFromTypeName(type.QualifiedName);
+            var prefix = "";
+            var suffix = "";
+            var indexer = "";
+
+            var containedType = field.InnerFqn();
+            var fieldAccessor = field.IsList() ? GetFieldIndexMethod(field) : GetFieldGetMethod(field);
+
+            if (field.HasEnum())
+            {
+                prefix = $"({containedType}) ";
+            }
+            else if (field.HasPrimitive(PrimitiveType.Bytes))
+            {
+                prefix = $"({containedType}) ";
+                suffix = ".Clone()";
+            }
+            else if (field.HasCustomType() || field.HasPrimitive(PrimitiveType.EntityId))
+            {
+                prefix = $"new {containedType}(";
+                suffix = ")";
+            }
+
+            if (field.IsList())
+            {
+                indexer = ", i";
+            }
+
+            return $"{prefix}fields.{fieldAccessor}({field.FieldId}{indexer}){suffix}";
+        }
+
+        private static string GetContainerAddStatement(TypeDescription type, FieldDefinition field, string fieldName, string value)
+        {
+            if (IsFieldRecursive(type, field))
+            {
+                return $"local.Add({value});";
+            }
+
+            return $"{fieldName} = {fieldName}.Add({value});";
+        }
+
+        private static string GetAssignmentForField(TypeDescription type, FieldDefinition field, string fieldName)
+        {
+            var fieldCount = GetFieldCountMethod(field);
+            var fieldIndexer = GetFieldIndexMethod(field);
+
+            return field.TypeSelector switch
+            {
+                FieldType.Option => $@"if (fields.GetObjectCount({field.FieldId}) > 0)
+{{
+    {fieldName} = {GetAssignmentInstantiation(field)};
+}}
+else
+{{
+    {fieldName} = null;
+}}",
+
+                FieldType.List => $@"{{
+    var count = fields.{fieldCount}({field.FieldId});
+    var local = {GetEmptyCollection(type, field)};
+    {fieldName} = local;
+
+    for (uint i = 0; i < count; i++)
+    {{
+        {GetContainerAddStatement(type, field, fieldName, GetAssignmentInstantiation(field))}
+    }}
+}}",
+
+                FieldType.Map => $@"{{
+    var count = fields.{fieldCount}({field.FieldId});
+        var local = {GetEmptyCollection(type, field)};
+    {fieldName} = local;
+
+    for(uint i = 0; i < fields.{fieldCount}({field.FieldId}); i++)
+    {{
+        var kvPair = fields.{fieldIndexer}({field.FieldId}, i);
+        {GetContainerAddStatement(type, field, fieldName, $"{GetMapObjectAssignment(field.MapType.KeyType, SchemaMapKeyFieldId)}, {GetMapObjectAssignment(field.MapType.ValueType, SchemaMapValueFieldId)}")};
+    }}
+}}",
+                FieldType.Singular => $"{fieldName} = {GetAssignmentInstantiation(field)};",
+
+                _ => throw new ArgumentOutOfRangeException()
+            };
+        }
+
+        private static string GenerateFromUpdate(TypeDescription type)
+        {
+            var typeName = type.TypeName();
 
             var text = new StringBuilder();
             var sb = new StringBuilder();
             foreach (var field in type.Fields)
             {
-                var fieldName = $"{SnakeCaseToPascalCase(field.Name)}";
+                var fieldName = field.PascalCase();
+                var getCount = GetFieldCountMethod(field);
 
-                var output = GetAssignmentForField(type, field, fieldName, bundle);
-                var fieldCount = GetFieldCountMethod(field);
+                var fieldUpdateExists = $"fields.{getCount}({field.FieldId}) > 0";
 
-                string guard;
+                var assignment = GetAssignmentForField(type, field, fieldName);
 
-                switch (field.TypeSelector)
+                var guard = field.TypeSelector switch
                 {
-                    case FieldType.Option:
-                        guard = $@"if (fields.{fieldCount}({field.FieldId}) > 0)
+                    FieldType.Singular => $@"if ({fieldUpdateExists})
 {{
-{Indent(1, output)}
+{Indent(1, assignment)}
+}}",
+                    // option, list, map
+                    _ => $@"if ({fieldUpdateExists})
+{{
+{Indent(1, assignment)}
 }}
-else if(FieldIsCleared({field.FieldId}, clearedFields))
+else if (FieldIsCleared({field.FieldId}, clearedFields))
 {{
     {fieldName} = {GetEmptyFieldInstantiationAsCsharp(type, field)};
-}}";
-                        break;
-                    case FieldType.List:
-                    case FieldType.Map:
-                        guard = $@"if (fields.{fieldCount}({field.FieldId}) > 0)
-{{
-{Indent(1, output)}
-}}
-else if(FieldIsCleared({field.FieldId}, clearedFields))
-{{
-    {fieldName} = {GetEmptyFieldInstantiationAsCsharp(type, field)};
-}}";
-                        break;
-                    case FieldType.Singular:
-                        guard = $@"if (fields.{fieldCount}({field.FieldId}) > 0)
-{{
-{Indent(1, output)}
-}}";
-                        break;
-                    default:
-                        throw new ArgumentOutOfRangeException();
-                }
+}}"
+                };
 
                 sb.AppendLine(guard);
             }
 
-            text.AppendLine($@"internal {typeName}({typeName} source, {SchemaComponentUpdate} update)
+            text.AppendLine($@"internal {typeName}(in {typeName} source, {SchemaComponentUpdate} update)
 {{
     var fields = update.GetFields();
     var clearedFields = update.GetClearedFields();
@@ -548,11 +294,11 @@ else if(FieldIsCleared({field.FieldId}, clearedFields))
 }}");
 
             text.AppendLine(
-                $@"private static bool FieldIsCleared(uint fieldId, uint[] fields)
+                $@"private static bool FieldIsCleared(uint fieldId, uint[] clearFields)
 {{
-    for (var i = 0; i < fields.Length; i++)
+    for (var i = 0; i < clearFields.Length; i++)
     {{
-        if (fields[i] == fieldId)
+        if (clearFields[i] == fieldId)
         {{
             return true;
         }}
@@ -576,7 +322,7 @@ public static {typeName} CreateFromSnapshot(global::Improbable.Worker.CInterop.E
     return new {typeName}();
 }}
 
-internal static {typeName} ApplyUpdate({typeName} source, {SchemaComponentUpdate}? update)
+internal static {typeName} ApplyUpdate(in {typeName} source, {SchemaComponentUpdate}? update)
 {{
     return update.HasValue ? new {typeName}(source, update.Value) : source;
 }}
@@ -586,124 +332,70 @@ public global::Improbable.Worker.CInterop.ComponentData ToData()
     var schemaData = global::Improbable.Worker.CInterop.SchemaComponentData.Create();
     ApplyToSchemaObject(schemaData.GetFields());
 
-    return new global::Improbable.Worker.CInterop.ComponentData({componentId}, schemaData);
+    return new global::Improbable.Worker.CInterop.ComponentData(ComponentId, schemaData);
 }}");
 
             return text.ToString();
         }
 
-        private static string GenerateUpdaters(IReadOnlyList<FieldDefinition> fields)
+
+        private static string GetValueAccessor(FieldDefinition field, string variableName) =>
+            field.TypeSelector switch
+            {
+                FieldType.Option when field.HasEnum() => $"(uint) {variableName}.Value",
+                FieldType.Option when field.CanPrimitiveBeNull() => variableName,
+                FieldType.Option when field.HasPrimitive(PrimitiveType.EntityId) => $"{variableName}.Value.Value",
+                FieldType.Option when field.HasCustomType() => $"{variableName}.Value",
+                FieldType.Option => $"{variableName}.Value",
+
+                FieldType.List when field.HasEnum() => $"(uint) {variableName}",
+                FieldType.List when field.HasPrimitive(PrimitiveType.EntityId) => $"{variableName}.Value",
+                FieldType.List => variableName,
+
+                FieldType.Singular when field.HasEnum() => $"(uint) {variableName}",
+                FieldType.Singular when field.HasPrimitive(PrimitiveType.EntityId) => $"{variableName}.Value",
+                FieldType.Singular => variableName,
+
+                _ => throw new ArgumentOutOfRangeException()
+            };
+
+        private static string GetUpdateValueStatement(FieldDefinition field, string variableName)
+        {
+            var fieldAddMethod = GetFieldAddMethod(field);
+
+            if (field.HasCustomType())
+            {
+                var value = field.IsOption() ? ".Value" : string.Empty;
+                return $"{variableName}{value}.ApplyToSchemaObject(fields.{fieldAddMethod}({field.FieldId}));";
+            }
+
+            return $"fields.{fieldAddMethod}({field.FieldId}, {GetValueAccessor(field, variableName)});";
+        }
+
+        private static string GenerateUpdaters(IEnumerable<FieldDefinition> fields)
         {
             var text = new StringBuilder();
             foreach (var field in fields)
             {
-                var fieldAddMethod = GetFieldAddMethod(field);
-
-                string output;
-                switch (field.TypeSelector)
+                var output = field.TypeSelector switch
                 {
-                    case FieldType.Option:
-                        switch (field.OptionType.InnerType.ValueTypeSelector)
-                        {
-                            case ValueType.Enum:
-                                output =
-                                    $@"if (newValue.HasValue)
+                    // =======
+                    FieldType.Option => $@"if (newValue{field.OptionValueTest()})
 {{
-    fields.{fieldAddMethod}({field.FieldId}, (uint)newValue.Value);
+    {GetUpdateValueStatement(field, "newValue")}
 }}
 else
 {{
     update.AddClearedField({field.FieldId});
-}}";
-                                break;
-                            case ValueType.Primitive:
-                                switch (field.OptionType.InnerType.Primitive)
-                                {
-                                    case PrimitiveType.Bytes:
-                                    case PrimitiveType.String:
-                                        output = $@"if (newValue != null)
-{{
-    fields.{fieldAddMethod}({field.FieldId}, newValue);
-}}
-else
-{{
-    update.AddClearedField({field.FieldId});
-}}";
-                                        break;
-                                    case PrimitiveType.EntityId:
-                                        output =
-                                            $@"if (newValue.HasValue)
-{{
-    fields.{fieldAddMethod}({field.FieldId}, newValue.Value.Value);
-}}
-else
-{{
-    update.AddClearedField({field.FieldId});
-}}";
-                                        break;
-                                    default:
-                                        output =
-                                            $@"if (newValue.HasValue)
-{{
-    fields.{fieldAddMethod}({field.FieldId}, newValue.Value);
-}}
-else
-{{
-    update.AddClearedField({field.FieldId});
-}}";
-                                        break;
-                                }
+}}",
 
-                                break;
-                            case ValueType.Type:
-                                output =
-                                    $@"if (newValue.HasValue)
-{{
-    newValue.Value.ApplyToSchemaObject(fields.{fieldAddMethod}({field.FieldId}));
-}}
-else
-{{
-    update.AddClearedField({field.FieldId});
-}}";
-                                break;
-                            default:
-                                throw new ArgumentOutOfRangeException();
-                        }
-
-                        break;
-                    case FieldType.List:
-                        string addType;
-                        switch (field.ListType.InnerType.ValueTypeSelector)
-                        {
-                            case ValueType.Enum:
-                                addType = $"fields.AddEnum({field.FieldId}, (uint)value);";
-                                break;
-                            case ValueType.Primitive:
-                                switch (field.ListType.InnerType.Primitive)
-                                {
-                                    case PrimitiveType.EntityId:
-                                        addType = $"fields.Add{field.ListType.InnerType.Primitive}({field.FieldId}, value.Value);";
-                                        break;
-                                    default:
-                                        addType = $"fields.Add{field.ListType.InnerType.Primitive}({field.FieldId}, value);";
-                                        break;
-                                }
-
-                                break;
-                            case ValueType.Type:
-                                addType = $"value.ApplyToSchemaObject(fields.AddObject({field.FieldId}));";
-                                break;
-                            default:
-                                throw new ArgumentOutOfRangeException();
-                        }
-
-                        output =
-                            $@"var any = false;
+                    // =======
+                    FieldType.List => $@"var any = false;
 if (newValue != null)
 {{
     foreach(var value in newValue)
     {{
-        {addType};
+        {GetUpdateValueStatement(field, "value")}
         any = true;
     }}
 }}
@@ -711,112 +403,34 @@ if (newValue != null)
 if (!any)
 {{
     update.AddClearedField({field.FieldId});
-}}";
+}}",
 
-                        break;
-                    case FieldType.Map:
-                        string setKeyType;
-                        string setValueType;
-
-                        switch (field.MapType.KeyType.ValueTypeSelector)
-                        {
-                            case ValueType.Enum:
-                                setKeyType = "kvPair.AddEnum(global::Improbable.Worker.CInterop.SchemaObject.SchemaMapKeyFieldId, (uint)kv.Key);";
-                                break;
-                            case ValueType.Primitive:
-                                switch (field.MapType.KeyType.Primitive)
-                                {
-                                    case PrimitiveType.EntityId:
-                                        setKeyType = $"kvPair.Add{field.MapType.KeyType.Primitive}(global::Improbable.Worker.CInterop.SchemaObject.SchemaMapKeyFieldId, kv.Key.Value);";
-                                        break;
-                                    default:
-                                        setKeyType = $"kvPair.Add{field.MapType.KeyType.Primitive}(global::Improbable.Worker.CInterop.SchemaObject.SchemaMapKeyFieldId, kv.Key);";
-                                        break;
-                                }
-
-                                break;
-                            case ValueType.Type:
-                                setKeyType = "kv.Key.ApplyToSchemaObject(kvPair.AddObject(global::Improbable.Worker.CInterop.SchemaObject.SchemaMapKeyFieldId));";
-                                break;
-                            default:
-                                throw new ArgumentOutOfRangeException();
-                        }
-
-                        switch (field.MapType.ValueType.ValueTypeSelector)
-                        {
-                            case ValueType.Enum:
-                                setValueType = "kvPair.AddEnum(global::Improbable.Worker.CInterop.SchemaObject.SchemaMapValueFieldId, (uint)kv.Value);";
-                                break;
-                            case ValueType.Primitive:
-                                switch (field.MapType.ValueType.Primitive)
-                                {
-                                    case PrimitiveType.EntityId:
-                                        setValueType = $"kvPair.Add{field.MapType.ValueType.Primitive}(global::Improbable.Worker.CInterop.SchemaObject.SchemaMapValueFieldId, kv.Value.Value);";
-                                        break;
-                                    default:
-                                        setValueType = $"kvPair.Add{field.MapType.ValueType.Primitive}(global::Improbable.Worker.CInterop.SchemaObject.SchemaMapValueFieldId, kv.Value);";
-                                        break;
-                                }
-
-                                break;
-                            case ValueType.Type:
-                                setValueType = "kv.Value.ApplyToSchemaObject(kvPair.AddObject(global::Improbable.Worker.CInterop.SchemaObject.SchemaMapValueFieldId));";
-                                break;
-                            default:
-                                throw new ArgumentOutOfRangeException();
-                        }
-
-                        output =
-                            $@"var any = false;
+                    // =======
+                    FieldType.Map => $@"var any = false;
 if (newValue != null)
 {{
     foreach(var kv in newValue)
     {{
         any = true;
         var kvPair = fields.AddObject({field.FieldId});
-        {setKeyType}
-        {setValueType}
+        {GetApplyMapObject(field.MapType.KeyType, SchemaMapKeyFieldId)}
+        {GetApplyMapObject(field.MapType.ValueType, SchemaMapValueFieldId)}
     }}
 }}
 
 if (!any)
 {{
     update.AddClearedField({field.FieldId});
-}}";
-                        break;
-                    case FieldType.Singular:
-                        switch (field.SingularType.Type.ValueTypeSelector)
-                        {
-                            case ValueType.Enum:
-                                output = $"fields.{fieldAddMethod}({field.FieldId}, (uint)newValue);";
-                                break;
-                            case ValueType.Primitive:
-                                switch (field.SingularType.Type.Primitive)
-                                {
-                                    case PrimitiveType.EntityId:
-                                        output = $"fields.{fieldAddMethod}({field.FieldId}, newValue.Value);";
+}}",
 
-                                        break;
-                                    default:
-                                        output = $"fields.{fieldAddMethod}({field.FieldId}, newValue);";
-                                        break;
-                                }
+                    // =======
+                    FieldType.Singular => GetUpdateValueStatement(field, "newValue"),
 
-                                break;
-                            case ValueType.Type:
-                                output = $"newValue.ApplyToSchemaObject(fields.{fieldAddMethod}({field.FieldId}));";
-                                break;
-                            default:
-                                throw new ArgumentOutOfRangeException();
-                        }
-
-                        break;
-                    default:
-                        throw new ArgumentOutOfRangeException();
-                }
+                    _ => throw new ArgumentOutOfRangeException()
+                };
 
                 text.AppendLine($@"
-internal static void Update{SnakeCaseToPascalCase(field.Name)}({SchemaComponentUpdate} update, {GetParameterTypeAsCsharp(field)} newValue)
+internal static void Update{field.PascalCase()}({SchemaComponentUpdate} update, {field.ParameterType()} newValue)
 {{
     var fields = update.GetFields();
 {Indent(1, output.TrimEnd())}
@@ -826,7 +440,7 @@ internal static void Update{SnakeCaseToPascalCase(field.Name)}({SchemaComponentU
             return text.ToString();
         }
 
-        private static string GenerateCreateGetEvents(IReadOnlyList<ComponentDefinition.EventDefinition> events)
+        private static string GenerateCreateGetEvents(IReadOnlyCollection<ComponentDefinition.EventDefinition> events)
         {
             if (events == null || events.Count == 0)
             {
@@ -837,8 +451,8 @@ internal static void Update{SnakeCaseToPascalCase(field.Name)}({SchemaComponentU
             var eventGetters = new StringBuilder();
             foreach (var evt in events)
             {
-                var eventPayloadType = CapitalizeNamespace(CapitalizeNamespace(evt.Type));
-                var identifierName = FieldNameToSafeName(SnakeCaseToCamelCase(evt.Name));
+                var eventPayloadType = evt.Fqn();
+                var identifierName = evt.CamelCase();
                 parameters.Append($",\n\t\tout global::System.Collections.Immutable.ImmutableArray<{eventPayloadType}> {identifierName}");
 
                 eventGetters.Append($@"{identifierName} = global::System.Collections.Immutable.ImmutableArray<{eventPayloadType}>.Empty;
@@ -855,36 +469,35 @@ public static bool TryGetEvents({SchemaComponentUpdate} update{parameters})
     var events = update.GetEvents();
 
 {Indent(1, eventGetters.ToString().TrimEnd())}
-    return {string.Join($"{Indent(2, "&& ")}\n", events.Select(evt => $"!{FieldNameToSafeName(SnakeCaseToCamelCase(evt.Name))}.IsDefaultOrEmpty"))};
+    return {string.Join($"{Indent(2, "&& ")}\n", events.Select(evt => $"!{evt.CamelCase()}.IsDefaultOrEmpty"))};
 }}";
         }
 
-        private string GenerateUpdateStruct(TypeDescription type, IReadOnlyList<FieldDefinition> fields)
+        private static string GenerateUpdateStruct(TypeDescription type, IReadOnlyList<FieldDefinition> fields)
         {
             var fieldText = new StringBuilder();
 
-            var typeName = GetPascalCaseNameFromTypeName(type.QualifiedName);
-            var typeNamespace = GetPascalCaseNamespaceFromTypeName(type.QualifiedName);
+            var typeName = type.Fqn();
 
             foreach (var field in fields)
             {
-                fieldText.AppendLine($"private {GetFieldTypeAsCsharp(type, field)} {FieldNameToSafeName(SnakeCaseToCamelCase(field.Name))};");
-                fieldText.AppendLine($"private bool was{SnakeCaseToPascalCase(field.Name)}Updated;");
+                fieldText.AppendLine($"private {FqnFieldType(type, field)} {field.CamelCase()};");
+                fieldText.AppendLine($"private bool was{field.PascalCase()}Updated;");
             }
 
             foreach (var ev in type.Events)
             {
-                fieldText.AppendLine($"private global::System.Collections.Generic.List<global::{CapitalizeNamespace(ev.Type)}> {SnakeCaseToCamelCase(ev.Name)}Events;");
+                fieldText.AppendLine($"private global::System.Collections.Generic.List<{ev.Fqn()}> {ev.CamelCase()}Events;");
             }
 
             var setMethodText = new StringBuilder();
 
             foreach (var field in fields)
             {
-                setMethodText.AppendLine($@"public Update Set{SnakeCaseToPascalCase(field.Name)}({GetParameterTypeAsCsharp(field)} {FieldNameToSafeName(SnakeCaseToCamelCase(field.Name))})
+                setMethodText.AppendLine($@"public Update Set{field.PascalCase()}({field.ParameterType()} {field.CamelCase()})
 {{
-    this.{FieldNameToSafeName(SnakeCaseToCamelCase(field.Name))} = {ParameterConversion(type, field)};
-    was{SnakeCaseToPascalCase(field.Name)}Updated = true;
+    this.{field.CamelCase()} = {InitializeFromParameter(type, field)};
+    was{field.PascalCase()}Updated = true;
     return this;
 }}
 ");
@@ -892,10 +505,10 @@ public static bool TryGetEvents({SchemaComponentUpdate} update{parameters})
 
             foreach (var ev in type.Events)
             {
-                setMethodText.AppendLine($@"public Update Add{SnakeCaseToPascalCase(ev.Name)}Event(global::{CapitalizeNamespace(ev.Type)} ev)
+                setMethodText.AppendLine($@"public Update Add{SnakeCaseToPascalCase(ev.Name)}Event({ev.Fqn()} ev)
 {{
-    this.{SnakeCaseToCamelCase(ev.Name)}Events = this.{SnakeCaseToCamelCase(ev.Name)}Events ?? new global::System.Collections.Generic.List<global::{CapitalizeNamespace(ev.Type)}>();
-    this.{SnakeCaseToCamelCase(ev.Name)}Events.Add(ev);
+    this.{ev.CamelCase()}Events = this.{ev.CamelCase()}Events ?? new global::System.Collections.Generic.List<{ev.Fqn()}>();
+    this.{ev.CamelCase()}Events.Add(ev);
     return this;
 }}
 ");
@@ -905,20 +518,21 @@ public static bool TryGetEvents({SchemaComponentUpdate} update{parameters})
 
             foreach (var field in fields)
             {
-                toUpdateMethodBody.AppendLine($@"if (was{SnakeCaseToPascalCase(field.Name)}Updated)
+                var name = field.PascalCase();
+                toUpdateMethodBody.AppendLine($@"if (was{name}Updated)
 {{
-    global::{typeNamespace}.{typeName}.Update{SnakeCaseToPascalCase(field.Name)}(update, {FieldNameToSafeName(SnakeCaseToCamelCase(field.Name))});
+    {typeName}.Update{name}(update, {field.CamelCase()});
 }}
 ");
             }
 
             foreach (var ev in type.Events)
             {
-                toUpdateMethodBody.AppendLine($@"if (this.{SnakeCaseToCamelCase(ev.Name)}Events != null)
+                toUpdateMethodBody.AppendLine($@"if (this.{ev.CamelCase()}Events != null)
 {{
     var events = update.GetEvents();
 
-    foreach (var ev in this.{SnakeCaseToCamelCase(ev.Name)}Events)
+    foreach (var ev in this.{ev.CamelCase()}Events)
     {{
         ev.ApplyToSchemaObject(events.AddObject({ev.EventIndex}));
     }}
@@ -939,30 +553,29 @@ public static bool TryGetEvents({SchemaComponentUpdate} update{parameters})
 
         return update;
     }}
-}}
-";
+}}";
         }
 
-        private string GenerateSchemaConstructor(TypeDescription type, IReadOnlyList<FieldDefinition> fields)
+        private static string GenerateConstructor(TypeDescription type, IReadOnlyCollection<FieldDefinition> fields)
         {
-            var typeName = GetPascalCaseNameFromTypeName(type.QualifiedName);
+            var typeName = type.TypeName();
 
             var parameters = new StringBuilder();
             var initializers = new StringBuilder();
             var text = new StringBuilder();
 
-            parameters.Append(string.Join(", ", fields.Select(f => $"{GetParameterTypeAsCsharp(f)} {FieldNameToSafeName(SnakeCaseToCamelCase(f.Name))} = default")));
+            parameters.Append(string.Join(", ", fields.Select(f => $"{f.ParameterType()} {f.CamelCase()} = default")));
             initializers.AppendLine(string.Join(Environment.NewLine, fields.Select(f =>
             {
                 var name = SnakeCaseToPascalCase(f.Name);
 
                 // Allow `null` to represent an empty collection.
-                if (f.TypeSelector == FieldType.List || f.TypeSelector == FieldType.Map)
+                if (f.IsList() || f.IsMap())
                 {
-                    return $"{name} = {FieldNameToSafeName(SnakeCaseToCamelCase(f.Name))} == null ? {EmptyCollection(type, f)} : {ParameterConversion(type, f)};";
+                    return $"{name} = {f.CamelCase()} == null ? {GetEmptyCollection(type, f)} : {InitializeFromParameter(type, f)};";
                 }
 
-                return $"{name} = {ParameterConversion(type, f)};";
+                return $"{name} = {InitializeFromParameter(type, f)};";
             })));
 
             if (fields.Count > 0)

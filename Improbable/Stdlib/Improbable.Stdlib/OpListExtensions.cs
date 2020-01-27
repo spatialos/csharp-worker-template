@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Improbable.Worker.CInterop;
 
 namespace Improbable.Stdlib
@@ -102,68 +103,32 @@ namespace Improbable.Stdlib
 
         public static IEnumerable<AddComponentOp> OfComponent(this IEnumerable<AddComponentOp> ops, uint componentId)
         {
-            foreach (var op in ops)
-            {
-                if (op.Data.ComponentId == componentId)
-                {
-                    yield return op;
-                }
-            }
+            return ops.Where(op => op.Data.ComponentId == componentId);
         }
 
         public static IEnumerable<RemoveComponentOp> OfComponent(this IEnumerable<RemoveComponentOp> ops, uint componentId)
         {
-            foreach (var op in ops)
-            {
-                if (op.ComponentId == componentId)
-                {
-                    yield return op;
-                }
-            }
+            return ops.Where(op => op.ComponentId == componentId);
         }
 
         public static IEnumerable<ComponentUpdateOp> OfComponent(this IEnumerable<ComponentUpdateOp> ops, uint componentId)
         {
-            foreach (var op in ops)
-            {
-                if (op.Update.ComponentId == componentId)
-                {
-                    yield return op;
-                }
-            }
+            return ops.Where(op => op.Update.ComponentId == componentId);
         }
 
         public static IEnumerable<AuthorityChangeOp> OfComponent(this IEnumerable<AuthorityChangeOp> ops, uint componentId)
         {
-            foreach (var op in ops)
-            {
-                if (op.ComponentId == componentId)
-                {
-                    yield return op;
-                }
-            }
+            return ops.Where(op => op.ComponentId == componentId);
         }
 
         public static IEnumerable<CommandRequestOp> OfComponent(this IEnumerable<CommandRequestOp> ops, uint componentId)
         {
-            foreach (var op in ops)
-            {
-                if (op.Request.ComponentId == componentId)
-                {
-                    yield return op;
-                }
-            }
+            return ops.Where(op => op.Request.ComponentId == componentId);
         }
 
         public static IEnumerable<CommandResponseOp> OfComponent(this IEnumerable<CommandResponseOp> ops, uint componentId)
         {
-            foreach (var op in ops)
-            {
-                if (op.Response.ComponentId == componentId)
-                {
-                    yield return op;
-                }
-            }
+            return ops.Where(op => op.Response.ComponentId == componentId);
         }
 
         private static unsafe TDest ReinterpretCast<TSource, TDest>(TSource source)
