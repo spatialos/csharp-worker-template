@@ -20,7 +20,6 @@ namespace Improbable.Stdlib
         private readonly Connection connection;
         private Task? metricsTask;
         private CancellationTokenSource? metricsCts;
-        private string? workerId;
         private readonly object connectionLock = new object();
         private readonly CancellationTokenSource processOpsCts = new CancellationTokenSource();
         private readonly BlockingCollection<OpList> ops = new BlockingCollection<OpList>();
@@ -31,6 +30,10 @@ namespace Improbable.Stdlib
         private WorkerConnection(Connection connection)
         {
             this.connection = connection;
+
+            WorkerId = connection.GetWorkerId();
+
+            StartBackgroundOpsGathering();
         }
 
         private void StartBackgroundOpsGathering()
@@ -113,7 +116,7 @@ namespace Improbable.Stdlib
         public static async Task<WorkerConnection> ConnectAsync(string host, ushort port, string workerName, ConnectionParameters connectionParameters, CancellationToken cancellation = default)
         {
             using var future = Connection.ConnectAsync(host, port, workerName, connectionParameters);
-            var connection = await future.ToTask(cancellation);
+            var connection = await future.ToTask(cancellation).ConfigureAwait(false);
 
             if (connection.GetConnectionStatusCode() != ConnectionStatusCode.Success)
             {
@@ -145,7 +148,7 @@ namespace Improbable.Stdlib
 
             using var locator = new Locator(options.SpatialOsHost, options.SpatialOsPort, locatorParameters);
             using var future = locator.ConnectAsync(connectionParameters);
-            var connection = await future.ToTask(cancellation);
+            var connection = await future.ToTask(cancellation).ConfigureAwait(false); ;
 
             if (connection == null)
             {
@@ -182,7 +185,7 @@ namespace Improbable.Stdlib
                         updater.Invoke(metrics);
                     }
 
-                    metrics.Load = await GetCpuUsageForProcess(metricsCts.Token) / 100.0;
+                    metrics.Load = await GetCpuUsageForProcess(metricsCts.Token).ConfigureAwait(false) / 100.0;
 
                     lock (connectionLock)
                     {
@@ -194,7 +197,7 @@ namespace Improbable.Stdlib
                         connection.SendMetrics(metrics);
                     }
 
-                    await Task.Delay(TimeSpan.FromSeconds(5), metricsCts.Token);
+                    await Task.Delay(TimeSpan.FromSeconds(5), metricsCts.Token).ConfigureAwait(false); ;
                 }
             }, metricsCts.Token);
         }
@@ -263,11 +266,6 @@ namespace Improbable.Stdlib
             if (value.Value.Status.Code != ConnectionStatusCode.Success)
             {
                 throw new AuthenticationException($"Error received while retrieving Login Tokens: {value.Value.Status.Detail}");
-            }
-
-            if (value.Value.LoginTokens.Count == 0)
-            {
-                throw new Exception("No deployment returned for this project.");
             }
 
             return value.Value.LoginTokens;
@@ -572,8 +570,6 @@ namespace Improbable.Stdlib
                     CancelCommands();
                     yield break;
                 }
-
-                OpList? opList = null;
 
                 try
                 {

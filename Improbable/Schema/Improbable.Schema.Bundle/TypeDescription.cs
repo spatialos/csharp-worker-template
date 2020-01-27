@@ -28,8 +28,6 @@ namespace Improbable.Schema.Bundle
 
         public readonly ImmutableArray<string> Warnings;
 
-        public readonly IReadOnlyList<string> Warnings;
-
         public readonly uint? ComponentId;
 
         /// <summary>
@@ -86,8 +84,14 @@ namespace Improbable.Schema.Bundle
                     warnings = warnings.Add($"field '{qualifiedName}.{f.Name}' is the Entity type, which is currently unsupported.");
                 }
 
-                return allowed;
-            }));
+                var isRecursiveField = IsFieldTypeRecursive(bundle, qualifiedName, f);
+                if (isRecursiveField)
+                {
+                    warnings = warnings.Add($"field '{qualifiedName}.{f.Name}' recursively references {qualifiedName}, which is currently unsupported.");
+                }
+
+                return !isEntityField && !isRecursiveField;
+        }));
 
             Warnings = warnings;
         }
@@ -98,13 +102,16 @@ namespace Improbable.Schema.Bundle
             // It is ignored for now.
             return f.TypeSelector switch
             {
+                FieldType.Map => (f.MapType.KeyType.HasPrimitive(PrimitiveType.Entity) || f.MapType.ValueType.HasPrimitive(PrimitiveType.Entity)),
                 FieldType.Option => (f.OptionType.InnerType.ValueTypeSelector == ValueType.Primitive && f.OptionType.InnerType.Primitive == PrimitiveType.Entity),
-                FieldType.List => (f.ListType.InnerType.ValueTypeSelector == ValueType.Primitive && f.ListType.InnerType.Primitive == PrimitiveType.Entity),
-                FieldType.Map => (f.MapType.KeyType.ValueTypeSelector == ValueType.Primitive && f.MapType.KeyType.Primitive == PrimitiveType.Entity ||
-                                  f.MapType.ValueType.ValueTypeSelector == ValueType.Primitive && f.MapType.ValueType.Primitive == PrimitiveType.Entity),
-                FieldType.Singular => (f.SingularType.Type.ValueTypeSelector == ValueType.Primitive && f.SingularType.Type.Primitive == PrimitiveType.Entity),
-                _ => false
+                _ => f.HasPrimitive(PrimitiveType.Entity)
             };
+        }
+
+        private static bool IsFieldTypeRecursive(Bundle bundle, string qualifiedRootTypeName, FieldDefinition field)
+        {
+            return field.IsOption() &&
+                   (field.HasCustomType(qualifiedRootTypeName) || field.HasCustomType() && bundle.Types[field.OptionType.InnerType.Type].Fields.Any(f => IsFieldTypeRecursive(bundle, qualifiedRootTypeName, f)));
         }
     }
 }

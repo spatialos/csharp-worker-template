@@ -26,7 +26,9 @@ namespace Improbable.CSharpCodeGen
         public static string GetAnnotationString(this IEnumerable<Annotation> annotations, string attributeName, int fieldIndex)
         {
             var annotation = annotations.Where(a => a.TypeValue.Type == attributeName).ToArray();
-            return !annotation.Any() ? "" : annotation.First().TypeValue.Fields[fieldIndex].Value.StringValue;
+            return !annotation.Any() ?
+                string.Empty :
+                annotation.First().TypeValue.Fields[fieldIndex].Value.StringValue;
         }
 
         public static IEnumerable<FieldDefinition> WithAnnotation(this IEnumerable<FieldDefinition> fields, string fieldIndex)
