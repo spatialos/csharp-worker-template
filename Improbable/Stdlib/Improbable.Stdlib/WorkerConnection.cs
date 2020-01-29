@@ -23,7 +23,7 @@ namespace Improbable.Stdlib
         private readonly object connectionLock = new object();
         private readonly CancellationTokenSource processOpsCts = new CancellationTokenSource();
         private readonly BlockingCollection<OpList> ops = new BlockingCollection<OpList>();
-        private Task processOpsTask;
+        private readonly Task processOpsTask;
 
         public string WorkerId { get; }
 
@@ -33,12 +33,12 @@ namespace Improbable.Stdlib
 
             WorkerId = connection.GetWorkerId();
 
-            StartBackgroundOpsGathering();
+            processOpsTask = StartBackgroundOpsGathering();
         }
 
-        private void StartBackgroundOpsGathering()
+        private Task StartBackgroundOpsGathering()
         {
-            processOpsTask = Task.Factory.StartNew(() =>
+            return Task.Factory.StartNew(() =>
             {
                 // We have to resort to polling here since connection.GetOpList doesn't provide a means of cancellation
                 try
