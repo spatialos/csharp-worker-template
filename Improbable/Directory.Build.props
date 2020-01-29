@@ -14,5 +14,6 @@
     <Copyright>Improbable Worlds, Ltd</Copyright>
 
     <NoWarn>NU5127;NU5128;$(NoWarn)</NoWarn>
+    <WarningsAsErrors>CS8600;CS8602;CS8603;$(WarningsAsErrors)</WarningsAsErrors>
   </PropertyGroup>
 </Project>
