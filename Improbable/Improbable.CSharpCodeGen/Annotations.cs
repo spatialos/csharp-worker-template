@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Improbable.Schema.Bundle;
@@ -11,24 +12,35 @@ namespace Improbable.CSharpCodeGen
             return f.Annotations.Select(a => a.TypeValue.Type).Intersect(attributeNames).Any();
         }
 
-        public static IEnumerable<string> GetAnnotationStrings(this IEnumerable<Annotation> annotations, string attributeName, int fieldNumber)
+        public static IEnumerable<string> GetAnnotationStrings(this IEnumerable<Annotation> annotations, string attributeName, int fieldIndex)
         {
-            var annotation = annotations.Where(a => a.TypeValue.Type == attributeName).ToArray();
-            if (!annotation.Any())
+            var instance = annotations.Where(a => a.TypeValue.Type == attributeName).ToArray();
+            if (!instance.Any())
             {
-                return new string[]{};
+                return Array.Empty<string>();
             }
 
-            var list = annotation.First().TypeValue.Fields[fieldNumber].Value.ListValue.Values;
-            return list.Select(v => v.StringValue);
+            var firstValue = instance.First();
+            var valueList = firstValue.TypeValue.Fields[fieldIndex].Value.ListValue;
+            if (valueList == null || valueList.Values.Any(v => v.StringValue == null))
+            {
+                throw new InvalidOperationException($"{firstValue.TypeValue.Type} is not a list<string> type.");
+            }
+
+            return valueList.Values.Select(v => v.StringValue ?? string.Empty);
         }
 
         public static string GetAnnotationString(this IEnumerable<Annotation> annotations, string attributeName, int fieldIndex)
         {
-            var annotation = annotations.Where(a => a.TypeValue.Type == attributeName).ToArray();
-            return !annotation.Any() ?
-                string.Empty :
-                annotation.First().TypeValue.Fields[fieldIndex].Value.StringValue;
+            var instance = annotations.Where(a => a.TypeValue.Type == attributeName).ToArray();
+            if (!instance.Any())
+            {
+                return string.Empty;
+            }
+
+            var firstValue = instance.First();
+            var value = firstValue.TypeValue.Fields[fieldIndex].Value.StringValue;
+            return value ?? string.Empty;
         }
 
         public static IEnumerable<FieldDefinition> WithAnnotation(this IEnumerable<FieldDefinition> fields, string fieldIndex)

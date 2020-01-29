@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using Improbable.Stdlib;
@@ -16,16 +17,18 @@ namespace Improbable.Postgres
         private string? cachedConnectionString;
         private readonly object rootLock = new object();
 
-        private readonly Dictionary<string, string> flagValues = new Dictionary<string, string>
-        {
-            {HostFlagName, "127.0.0.1"},
-            {UserNameFlagName, "postgres"},
-            {PasswordFlagName, "DO_NOT_USE_IN_PRODUCTION"},
-            {DatabaseFlagName, "postgres"},
-            {AdditionalFlagName, string.Empty}
-        };
+        private readonly ConcurrentDictionary<string, string> flagValues = new ConcurrentDictionary<string, string>(
+            new Dictionary<string, string>
+            {
+                {HostFlagName, "127.0.0.1"},
+                {UserNameFlagName, "postgres"},
+                {PasswordFlagName, "DO_NOT_USE_IN_PRODUCTION"},
+                {DatabaseFlagName, "postgres"},
+                {AdditionalFlagName, string.Empty}
+            }
+        );
 
-        private readonly List<string> keys;
+        private readonly IReadOnlyList<string> keys;
 
         public delegate string GetStringDelegate(string flagName, string currentFlagValue);
 
@@ -33,7 +36,7 @@ namespace Improbable.Postgres
         {
             keys = flagValues.Keys.ToList();
 
-            foreach (var (key, currentValue) in flagValues.ToList())
+            foreach (var (key, currentValue) in flagValues)
             {
                 var value = getter(key, currentValue);
 
@@ -80,9 +83,10 @@ namespace Improbable.Postgres
                     throw new ArgumentNullException(nameof(PostgresHost));
                 }
 
+                flagValues[HostFlagName] = value;
+
                 lock (rootLock)
                 {
-                    flagValues[HostFlagName] = value;
                     cachedConnectionString = null;
                 }
             }
@@ -90,13 +94,7 @@ namespace Improbable.Postgres
 
         public string PostgresUserName
         {
-            get
-            {
-                lock (rootLock)
-                {
-                    return flagValues[UserNameFlagName];
-                }
-            }
+            get => flagValues[UserNameFlagName];
             set
             {
                 if (string.IsNullOrEmpty(value))
@@ -104,9 +102,10 @@ namespace Improbable.Postgres
                     throw new ArgumentNullException(nameof(PostgresUserName));
                 }
 
+                flagValues[UserNameFlagName] = value;
+
                 lock (rootLock)
                 {
-                    flagValues[UserNameFlagName] = value;
                     cachedConnectionString = null;
                 }
             }
@@ -114,13 +113,7 @@ namespace Improbable.Postgres
 
         public string PostgresPassword
         {
-            get
-            {
-                lock (rootLock)
-                {
-                    return flagValues[PasswordFlagName];
-                }
-            }
+            get => flagValues[PasswordFlagName];
             set
             {
                 if (string.IsNullOrEmpty(value))
@@ -128,9 +121,10 @@ namespace Improbable.Postgres
                     throw new ArgumentNullException(nameof(PostgresPassword));
                 }
 
+                flagValues[PasswordFlagName] = value;
+
                 lock (rootLock)
                 {
-                    flagValues[PasswordFlagName] = value;
                     cachedConnectionString = null;
                 }
             }
@@ -138,18 +132,13 @@ namespace Improbable.Postgres
 
         public string PostgresDatabase
         {
-            get
-            {
-                lock (rootLock)
-                {
-                    return flagValues[DatabaseFlagName];
-                }
-            }
+            get => flagValues[DatabaseFlagName];
             set
             {
+                flagValues[DatabaseFlagName] = value;
+
                 lock (rootLock)
                 {
-                    flagValues[DatabaseFlagName] = value;
                     cachedConnectionString = null;
                 }
             }
@@ -157,18 +146,13 @@ namespace Improbable.Postgres
 
         public string PostgresAdditionalOptions
         {
-            get
-            {
-                lock (rootLock)
-                {
-                    return flagValues[AdditionalFlagName];
-                }
-            }
+            get => flagValues[AdditionalFlagName];
             set
             {
+                flagValues[AdditionalFlagName] = value;
+
                 lock (rootLock)
                 {
-                    flagValues[AdditionalFlagName] = value;
                     cachedConnectionString = null;
                 }
             }
@@ -189,20 +173,20 @@ namespace Improbable.Postgres
         {
             foreach (var key in keys)
             {
-                var value = string.Empty;
-                if (!opList.TryGetWorkerFlagChange(key, ref value))
+                if (!opList.TryGetWorkerFlagChange(key, out var value))
                 {
                     continue;
                 }
 
+                if (string.IsNullOrEmpty(value) && !IsEmptyStringAllowed(key))
+                {
+                    continue;
+                }
+
+                flagValues[key] = value;
+
                 lock (rootLock)
                 {
-                    if (string.IsNullOrEmpty(value) && !IsEmptyStringAllowed(key))
-                    {
-                        continue;
-                    }
-
-                    flagValues[key] = value;
                     cachedConnectionString = null;
                 }
             }

@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 using System.Text;
 using Newtonsoft.Json;
@@ -21,6 +22,10 @@ namespace Improbable.Schema.Bundle
             };
 
             var bundleFile = JsonConvert.DeserializeObject<SchemaBundle>(File.ReadAllText(filename, Encoding.UTF8), settings);
+            if (bundleFile == null)
+            {
+                throw new InvalidOperationException($"Failed to deserialize {filename}");
+            }
 
             return new Bundle(bundleFile);
         }

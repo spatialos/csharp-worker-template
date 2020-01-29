@@ -49,7 +49,7 @@ namespace Improbable.Schema.Bundle
                 ComponentId = component.ComponentId;
 
                 SourceReference = bundle.Components[qualifiedName].SourceReference;
-                OuterType = "";
+                OuterType = string.Empty;
 
                 Events = component.Events;
                 Annotations = component.Annotations;
@@ -98,6 +98,7 @@ namespace Improbable.Schema.Bundle
 
         private static bool IsPrimitiveEntityField(FieldDefinition f)
         {
+#nullable disable
             // The Entity primitive type is currently unsupported, and undocumented.
             // It is ignored for now.
             return f.TypeSelector switch
@@ -105,12 +106,15 @@ namespace Improbable.Schema.Bundle
                 FieldType.Map => (f.MapType.KeyType.HasPrimitive(PrimitiveType.Entity) || f.MapType.ValueType.HasPrimitive(PrimitiveType.Entity)),
                 _ => f.HasPrimitive(PrimitiveType.Entity)
             };
+#nullable restore
         }
 
         private static bool IsFieldTypeRecursive(Bundle bundle, string qualifiedRootTypeName, FieldDefinition field)
         {
+#nullable disable
             return field.IsOption() &&
                    (field.HasCustomType(qualifiedRootTypeName) || field.HasCustomType() && bundle.Types[field.OptionType.InnerType.Type].Fields.Any(f => IsFieldTypeRecursive(bundle, qualifiedRootTypeName, f)));
+#nullable restore
         }
     }
 }
