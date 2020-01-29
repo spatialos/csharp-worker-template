@@ -35,8 +35,6 @@ namespace Improbable.Schema.Bundle
 
     public class TypeReference
     {
-        public static readonly TypeReference Empty = new TypeReference();
-
         public string? Enum;
         public PrimitiveType Primitive;
         public string? Type;
@@ -67,8 +65,6 @@ namespace Improbable.Schema.Bundle
 
     public class Value
     {
-        public static readonly Value Empty = new Value();
-
         public bool? BoolValue;
         public string? BytesValue;
         public double? DoubleValue;
@@ -88,7 +84,7 @@ namespace Improbable.Schema.Bundle
 
         public class OptionValueHolder
         {
-            public Value Value = Empty;
+            public Value Value = new Value();
         }
 
         public class ListValueHolder
@@ -102,8 +98,8 @@ namespace Improbable.Schema.Bundle
 
             public class MapPairValue
             {
-                public Value Key = Empty;
-                public Value Value = Empty;
+                public Value Key = new Value();
+                public Value Value = new Value();
             }
         }
     }
@@ -117,32 +113,34 @@ namespace Improbable.Schema.Bundle
         public string Value = string.Empty;
     }
 
+    [DebuggerDisplay("{" + nameof(Type) + "}")]
     public class TypeValue
     {
-        public static readonly TypeValue Empty = new TypeValue();
         public ImmutableArray<FieldValue> Fields = ImmutableArray<FieldValue>.Empty;
 
         public string Type = string.Empty;
 
+        [DebuggerDisplay("{" + nameof(Name) + "}")]
         public class FieldValue
         {
             public string Name = string.Empty;
-            public SourceReference SourceReference = SourceReference.Empty;
-            public Value Value = Value.Empty;
+            public SourceReference SourceReference = new SourceReference();
+            public Value Value = new Value();
         }
     }
 
+    [DebuggerDisplay("{" + nameof(TypeValue) + "}")]
     public class Annotation
     {
-        public SourceReference SourceReference = SourceReference.Empty;
-        public TypeValue TypeValue = TypeValue.Empty;
+        public SourceReference SourceReference = new SourceReference();
+        public TypeValue TypeValue = new TypeValue();
     }
 
     public class EnumValueDefinition
     {
         public ImmutableArray<Annotation> Annotations = ImmutableArray<Annotation>.Empty;
         public string Name = string.Empty;
-        public SourceReference SourceReference = SourceReference.Empty;
+        public SourceReference SourceReference = new SourceReference();
 
         public uint Value;
     }
@@ -154,7 +152,7 @@ namespace Improbable.Schema.Bundle
         public string Name = string.Empty;
         public string OuterType = string.Empty;
         public string QualifiedName = string.Empty;
-        public SourceReference SourceReference = SourceReference.Empty;
+        public SourceReference SourceReference = new SourceReference();
         public ImmutableArray<EnumValueDefinition> Values = ImmutableArray<EnumValueDefinition>.Empty;
     }
 
@@ -180,7 +178,7 @@ namespace Improbable.Schema.Bundle
         public OptionTypeRef? OptionType;
         public SingularTypeRef? SingularType;
 
-        public SourceReference SourceReference = SourceReference.Empty;
+        public SourceReference SourceReference = new SourceReference();
 
         public bool Transient;
 
@@ -214,23 +212,23 @@ namespace Improbable.Schema.Bundle
 
         public class SingularTypeRef
         {
-            public TypeReference Type = TypeReference.Empty;
+            public TypeReference Type = new TypeReference();
         }
 
         public class OptionTypeRef
         {
-            public TypeReference InnerType = TypeReference.Empty;
+            public TypeReference InnerType = new TypeReference();
         }
 
         public class ListTypeRef
         {
-            public TypeReference InnerType = TypeReference.Empty;
+            public TypeReference InnerType = new TypeReference();
         }
 
         public class MapTypeRef
         {
-            public TypeReference KeyType = TypeReference.Empty;
-            public TypeReference ValueType = TypeReference.Empty;
+            public TypeReference KeyType = new TypeReference();
+            public TypeReference ValueType = new TypeReference();
         }
     }
 
@@ -242,7 +240,7 @@ namespace Improbable.Schema.Bundle
         public string Name = string.Empty;
         public string OuterType = string.Empty;
         public string QualifiedName = string.Empty;
-        public SourceReference SourceReference = SourceReference.Empty;
+        public SourceReference SourceReference = new SourceReference();
     }
 
     [DebuggerDisplay("{" + nameof(QualifiedName) + "} {" + nameof(ComponentId) + "}")]
@@ -259,7 +257,7 @@ namespace Improbable.Schema.Bundle
         public string Name = string.Empty;
 
         public string QualifiedName = string.Empty;
-        public SourceReference SourceReference = SourceReference.Empty;
+        public SourceReference SourceReference = new SourceReference();
 
         [DebuggerDisplay("{" + nameof(QualifiedName) + "}")]
         public class EventDefinition
@@ -267,7 +265,7 @@ namespace Improbable.Schema.Bundle
             public ImmutableArray<Annotation> Annotations = ImmutableArray<Annotation>.Empty;
             public uint EventIndex;
             public string Name = string.Empty;
-            public SourceReference SourceReference = SourceReference.Empty;
+            public SourceReference SourceReference = new SourceReference();
             public string Type = string.Empty;
         }
 
@@ -280,7 +278,7 @@ namespace Improbable.Schema.Bundle
             public string Name = string.Empty;
             public string RequestType = string.Empty;
             public string ResponseType = string.Empty;
-            public SourceReference SourceReference = SourceReference.Empty;
+            public SourceReference SourceReference = new SourceReference();
         }
     }
 
@@ -288,7 +286,6 @@ namespace Improbable.Schema.Bundle
     {
         public uint Column;
         public uint Line;
-        public static readonly SourceReference Empty = new SourceReference();
     }
 
     public class SchemaBundle
@@ -298,16 +295,14 @@ namespace Improbable.Schema.Bundle
 
     public class Package
     {
-        public static readonly Package Empty = new Package();
-
         public string Name = string.Empty;
-        public SourceReference SourceReference = SourceReference.Empty;
+        public SourceReference SourceReference = new SourceReference();
     }
 
     public class Import
     {
         public string Path = string.Empty;
-        public SourceReference SourceReference = SourceReference.Empty;
+        public SourceReference SourceReference = new SourceReference();
     }
 
     public class SchemaFile
@@ -316,7 +311,7 @@ namespace Improbable.Schema.Bundle
         public ImmutableArray<ComponentDefinition> Components = ImmutableArray<ComponentDefinition>.Empty;
         public ImmutableArray<EnumDefinition> Enums = ImmutableArray<EnumDefinition>.Empty;
         public ImmutableArray<Import> Imports = ImmutableArray<Import>.Empty;
-        public Package Package = Package.Empty;
+        public Package Package = new Package();
         public ImmutableArray<TypeDefinition> Types = ImmutableArray<TypeDefinition>.Empty;
     }
 }

@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Linq;
@@ -91,7 +90,7 @@ namespace Improbable.Schema.Bundle
                 }
 
                 return !isEntityField && !isRecursiveField;
-        }));
+            }));
 
             Warnings = warnings;
         }
