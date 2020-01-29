@@ -1,5 +1,4 @@
-using System;
-using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Linq;
 
@@ -16,17 +15,17 @@ namespace Improbable.Schema.Bundle
 
         public readonly SchemaFile SourceFile;
 
-        public readonly IReadOnlyList<TypeDescription> NestedTypes;
+        public readonly ImmutableList<TypeDescription> NestedTypes;
 
-        public readonly IReadOnlyList<EnumDefinition> NestedEnums;
+        public readonly ImmutableArray<EnumDefinition> NestedEnums;
 
-        public readonly IReadOnlyList<FieldDefinition> Fields;
+        public readonly ImmutableArray<FieldDefinition> Fields;
 
-        public readonly IReadOnlyList<Annotation> Annotations;
+        public readonly ImmutableArray<Annotation> Annotations;
 
-        public readonly IReadOnlyList<ComponentDefinition.EventDefinition> Events;
+        public readonly ImmutableArray<ComponentDefinition.EventDefinition> Events;
 
-        public readonly IReadOnlyList<string> Warnings;
+        public readonly ImmutableArray<string> Warnings;
 
         public readonly uint? ComponentId;
 
@@ -42,73 +41,63 @@ namespace Improbable.Schema.Bundle
 
             IsRestricted = qualifiedName.StartsWith("improbable.restricted");
 
-            NestedEnums = bundle.Enums.Where(e => e.Value.OuterType == qualifiedName)
-                .Select(type => bundle.Enums[type.Key]).ToList();
+            NestedEnums = ImmutableArray.CreateRange(bundle.Enums.Where(e => e.Value.OuterType == qualifiedName).Select(type => bundle.Enums[type.Key]));
 
-            bundle.Components.TryGetValue(qualifiedName, out var component);
-            ComponentId = component?.ComponentId;
-
-            SourceFile = bundle.TypeToFile[qualifiedName];
-
-            if (ComponentId.HasValue)
+            if (bundle.Components.TryGetValue(qualifiedName, out var component))
             {
+                ComponentId = component.ComponentId;
+
                 SourceReference = bundle.Components[qualifiedName].SourceReference;
                 OuterType = string.Empty;
+
+                Events = component.Events;
+                Annotations = component.Annotations;
+
+                Fields = !string.IsNullOrEmpty(component.DataDefinition) ? bundle.Types[component.DataDefinition].Fields : bundle.Components[qualifiedName].Fields;
             }
             else
             {
                 SourceReference = bundle.Types[qualifiedName].SourceReference;
                 OuterType = bundle.Types[qualifiedName].OuterType;
+
+                Fields = bundle.Types[qualifiedName].Fields;
+                Annotations = bundle.Types[qualifiedName].Annotations;
+                ComponentId = null;
             }
 
-            NestedTypes = bundle.Types.Where(t => t.Value.OuterType == qualifiedName)
-                .Select(type => new TypeDescription(bundle.Types[type.Key].QualifiedName, bundle)).ToList();
+            SourceFile = bundle.TypeToFile[qualifiedName];
 
-            Fields = component?.Fields;
-
-            if (!string.IsNullOrEmpty(component?.DataDefinition))
+            NestedTypes = ImmutableList.CreateRange(bundle.Types.Where(t => t.Value.OuterType == qualifiedName).Select(type =>
             {
-                // Inline fields into the component.
-                Fields = bundle.Types[component.DataDefinition].Fields;
-            }
+                var t = bundle.Types[type.Key];
+                return new TypeDescription(t.QualifiedName, bundle);
+            }));
 
-            if (Fields == null)
-            {
-                Fields = ComponentId.HasValue ? bundle.Components[qualifiedName].Fields : bundle.Types[qualifiedName].Fields;
-            }
-
-            if (Fields == null)
-            {
-                throw new Exception("Internal error: no fields found");
-            }
-
-            var warnings = new List<string>();
-            Warnings = warnings;
-
-            Fields = Fields.Where(f =>
+            var warnings = ImmutableArray<string>.Empty;
+            Fields = ImmutableArray.CreateRange(Fields.Where(f =>
             {
                 var isEntityField = IsPrimitiveEntityField(f);
 
                 if (isEntityField)
                 {
-                    warnings.Add($"field '{qualifiedName}.{f.Name}' is the Entity type, which is currently unsupported.");
+                    warnings = warnings.Add($"field '{qualifiedName}.{f.Name}' is the Entity type, which is currently unsupported.");
                 }
 
                 var isRecursiveField = IsFieldTypeRecursive(bundle, qualifiedName, f);
                 if (isRecursiveField)
                 {
-                    warnings.Add($"field '{qualifiedName}.{f.Name}' recursively references {qualifiedName}, which is currently unsupported.");
+                    warnings = warnings.Add($"field '{qualifiedName}.{f.Name}' recursively references {qualifiedName}, which is currently unsupported.");
                 }
 
                 return !isEntityField && !isRecursiveField;
-            }).ToList();
+            }));
 
-            Annotations = component != null ? component.Annotations : bundle.Types[qualifiedName].Annotations;
-            Events = component?.Events;
+            Warnings = warnings;
         }
 
         private static bool IsPrimitiveEntityField(FieldDefinition f)
         {
+#nullable disable
             // The Entity primitive type is currently unsupported, and undocumented.
             // It is ignored for now.
             return f.TypeSelector switch
@@ -116,12 +105,15 @@ namespace Improbable.Schema.Bundle
                 FieldType.Map => (f.MapType.KeyType.HasPrimitive(PrimitiveType.Entity) || f.MapType.ValueType.HasPrimitive(PrimitiveType.Entity)),
                 _ => f.HasPrimitive(PrimitiveType.Entity)
             };
+#nullable restore
         }
 
         private static bool IsFieldTypeRecursive(Bundle bundle, string qualifiedRootTypeName, FieldDefinition field)
         {
+#nullable disable
             return field.IsOption() &&
                    (field.HasCustomType(qualifiedRootTypeName) || field.HasCustomType() && bundle.Types[field.OptionType.InnerType.Type].Fields.Any(f => IsFieldTypeRecursive(bundle, qualifiedRootTypeName, f)));
+#nullable restore
         }
     }
 }

@@ -36,6 +36,7 @@ namespace Improbable.Schema.Bundle
 
         public static bool HasEnum(this FieldDefinition field)
         {
+#nullable disable
             return field.TypeSelector switch
             {
                 FieldType.Option => field.OptionType.InnerType.HasEnum(),
@@ -44,10 +45,12 @@ namespace Improbable.Schema.Bundle
                 FieldType.Singular => field.SingularType.Type.HasEnum(),
                 _ => throw new ArgumentOutOfRangeException()
             };
+#nullable restore
         }
 
         public static bool HasPrimitive(this FieldDefinition field)
         {
+#nullable disable
             return field.TypeSelector switch
             {
                 FieldType.Option => field.OptionType.InnerType.HasPrimitive(),
@@ -56,10 +59,12 @@ namespace Improbable.Schema.Bundle
                 FieldType.Singular => field.SingularType.Type.HasPrimitive(),
                 _ => throw new ArgumentOutOfRangeException()
             };
+#nullable restore
         }
 
         public static bool HasPrimitive(this FieldDefinition field, PrimitiveType type)
         {
+#nullable disable
             return field.TypeSelector switch
             {
                 FieldType.Option => field.OptionType.InnerType.HasPrimitive(type),
@@ -68,10 +73,12 @@ namespace Improbable.Schema.Bundle
                 FieldType.Singular => field.SingularType.Type.HasPrimitive(type),
                 _ => throw new ArgumentOutOfRangeException()
             };
+#nullable restore
         }
 
         public static bool HasCustomType(this FieldDefinition field)
         {
+#nullable disable
             return field.TypeSelector switch
             {
                 FieldType.Option => field.OptionType.InnerType.HasCustomType(),
@@ -80,10 +87,13 @@ namespace Improbable.Schema.Bundle
                 FieldType.Singular => field.SingularType.Type.HasCustomType(),
                 _ => throw new ArgumentOutOfRangeException()
             };
+#nullable restore
+
         }
 
         public static bool HasCustomType(this FieldDefinition field, string qualifiedTypeName)
         {
+#nullable disable
             return field.TypeSelector switch
             {
                 FieldType.Option => field.OptionType.InnerType.HasCustomType(qualifiedTypeName),
@@ -92,6 +102,7 @@ namespace Improbable.Schema.Bundle
                 FieldType.Singular => field.SingularType.Type.HasCustomType(qualifiedTypeName),
                 _ => throw new ArgumentOutOfRangeException()
             };
+#nullable restore
         }
 
         public static bool CanPrimitiveBeNull(this FieldDefinition field)

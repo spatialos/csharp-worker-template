@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project>
+  <Target BeforeTargets="BeforeBuild" Condition="'$(Version)'!='' AND '$(AutoPublishPackages)'!=''" Name="Improbable_CleanLocalPackages">
+    <RemoveDir Directories="$(USERPROFILE)/.nuget/packages/$(ProjectName)" />
+    <Message Text="CLEANING OUT $(USERPROFILE)/.nuget/packages/$(ProjectName)" Importance="High"/>
+  </Target>
+
+  <Target AfterTargets="AfterBuild" Condition="'$(Version)'!='' AND '$(AutoPublishPackages)'!=''" Name="Improbable_PublishLocalPackages">
+    <Delete Files="$(SolutionDir)../nupkgs/$(ProjectName).$(Version).nupkg" />
+    <Exec Command="dotnet pack &quot;$(MSBuildProjectFullPath)&quot; -p:Platform=$(Platform) -c &quot;$(Configuration)&quot; --nologo --no-build --output &quot;$(SolutionDir)../nupkgs&quot;" WorkingDirectory="$(SolutionDir)"/>
+  </Target>
+</Project>

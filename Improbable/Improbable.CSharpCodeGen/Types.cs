@@ -105,7 +105,7 @@ namespace Improbable.CSharpCodeGen
             {
                 throw new InvalidOperationException("Must be called for an option<> field");
             }
-
+#nullable disable
             return field.OptionType.InnerType.ValueTypeSelector switch
             {
                 ValueType.Enum => "?",
@@ -115,6 +115,7 @@ namespace Improbable.CSharpCodeGen
                 ValueType.Primitive => "?",
                 _ => throw new ArgumentOutOfRangeException()
             };
+#nullable restore
         }
 
         public static string OptionValueTest(this FieldDefinition field)
@@ -123,7 +124,7 @@ namespace Improbable.CSharpCodeGen
             {
                 throw new InvalidOperationException("Must be called for an option<> field");
             }
-
+#nullable disable
             return field.OptionType.InnerType.ValueTypeSelector switch
             {
                 ValueType.Enum => ".HasValue",
@@ -133,6 +134,7 @@ namespace Improbable.CSharpCodeGen
                 ValueType.Type => ".HasValue",
                 _ => throw new ArgumentOutOfRangeException()
             };
+#nullable restore
         }
 
         private static string OptionValueSuffix(this FieldDefinition field)
@@ -141,7 +143,7 @@ namespace Improbable.CSharpCodeGen
             {
                 throw new InvalidOperationException("Must be called for an option<> field");
             }
-
+#nullable disable
             return field.OptionType.InnerType.ValueTypeSelector switch
             {
                 ValueType.Enum => ".Value",
@@ -151,9 +153,11 @@ namespace Improbable.CSharpCodeGen
                 ValueType.Primitive => ".Value",
                 _ => throw new ArgumentOutOfRangeException()
             };
+#nullable restore
         }
 
         public static string FqnFieldType(TypeDescription type, FieldDefinition field) =>
+#nullable disable
             field.TypeSelector switch
             {
                 FieldType.Option => $"{field.InnerFqn()}{field.OptionTypeSuffix()}",
@@ -166,8 +170,10 @@ namespace Improbable.CSharpCodeGen
                 FieldType.Map => $"global::System.Collections.Immutable.ImmutableDictionary<{field.MapType.KeyType.Fqn()}, {field.MapType.ValueType.Fqn()}>",
                 _ => throw new ArgumentOutOfRangeException()
             };
+#nullable restore
 
         public static string ParameterType(this FieldDefinition field) =>
+#nullable disable
             field.TypeSelector switch
             {
                 FieldType.Option => $"{field.InnerFqn()}{field.OptionTypeSuffix()}",
@@ -176,8 +182,10 @@ namespace Improbable.CSharpCodeGen
                 FieldType.Singular => field.SingularType.Type.Fqn(),
                 _ => throw new ArgumentOutOfRangeException()
             };
+#nullable restore
 
         public static string GetEmptyCollection(TypeDescription type, FieldDefinition field) =>
+#nullable disable
             field.TypeSelector switch
             {
                 FieldType.List when IsFieldRecursive(type, field) => $"new global::System.Collections.Generic.List<{field.InnerFqn()}>()",
@@ -188,6 +196,7 @@ namespace Improbable.CSharpCodeGen
 
                 _ => throw new ArgumentOutOfRangeException(nameof(field.TypeSelector))
             };
+#nullable restore
 
         public static string InitializeFromParameter(TypeDescription type, FieldDefinition field) =>
             field.TypeSelector switch
@@ -202,6 +211,7 @@ namespace Improbable.CSharpCodeGen
             };
 
         public static string GetEmptyFieldInstantiationAsCsharp(TypeDescription type, FieldDefinition field) =>
+#nullable disable
             field.TypeSelector switch
             {
                 FieldType.Option => "null",
@@ -215,6 +225,7 @@ namespace Improbable.CSharpCodeGen
 
                 _ => throw new ArgumentOutOfRangeException()
             };
+#nullable restore
 
         public static string PascalCase(this FieldDefinition field) => SnakeCaseToPascalCase(field.Name);
 
@@ -233,6 +244,7 @@ namespace Improbable.CSharpCodeGen
         public static string Fqn(this ComponentDefinition.EventDefinition evt) => Case.Fqn(evt.Type);
 
         public static string Fqn(this TypeReference typeRef) =>
+#nullable disable
             typeRef.ValueTypeSelector switch
             {
                 ValueType.Enum => $"{Case.Fqn(typeRef.Enum)}",
@@ -261,9 +273,11 @@ namespace Improbable.CSharpCodeGen
                 ValueType.Type => $"{Case.Fqn(typeRef.Type)}",
                 _ => throw new ArgumentOutOfRangeException()
             };
+#nullable restore
 
         public static string FieldToHash(FieldDefinition field)
         {
+#nullable disable
             var fieldName = field.PascalCase();
 
             return field.TypeSelector switch
@@ -288,6 +302,7 @@ namespace Improbable.CSharpCodeGen
                 },
                 _ => throw new ArgumentOutOfRangeException()
             };
+#nullable restore
         }
 
         public static string FieldToEquals(FieldDefinition field)
@@ -295,7 +310,7 @@ namespace Improbable.CSharpCodeGen
             var fieldName = field.PascalCase();
 
             const string structuralComparer = "global::System.Collections.StructuralComparisons.StructuralEqualityComparer";
-
+#nullable disable
             return field.TypeSelector switch
             {
                 FieldType.Option => $"{fieldName} == other.{fieldName}",
@@ -316,11 +331,11 @@ namespace Improbable.CSharpCodeGen
                 },
                 _ => throw new ArgumentOutOfRangeException()
             };
+#nullable restore
         }
 
-        public static string GetFieldGetMethod(FieldDefinition field)
-        {
-            return field.TypeSelector switch
+        public static string GetFieldGetMethod(FieldDefinition field) =>
+            field.TypeSelector switch
             {
                 FieldType.List when field.HasCustomType() => "IndexObject",
                 FieldType.Map => "IndexObject",
@@ -331,11 +346,9 @@ namespace Improbable.CSharpCodeGen
 
                 _ => throw new ArgumentOutOfRangeException()
             };
-        }
 
-        public static string GetFieldAddMethod(FieldDefinition field)
-        {
-            return field.TypeSelector switch
+        public static string GetFieldAddMethod(FieldDefinition field) =>
+            field.TypeSelector switch
             {
                 FieldType.Map => "AddObject",
 
@@ -345,11 +358,9 @@ namespace Improbable.CSharpCodeGen
 
                 _ => throw new ArgumentOutOfRangeException()
             };
-        }
 
-        public static string GetFieldCountMethod(FieldDefinition field)
-        {
-            return field.TypeSelector switch
+        public static string GetFieldCountMethod(FieldDefinition field) =>
+            field.TypeSelector switch
             {
                 FieldType.Map => "GetObjectCount",
 
@@ -359,11 +370,9 @@ namespace Improbable.CSharpCodeGen
 
                 _ => throw new ArgumentOutOfRangeException()
             };
-        }
 
-        public static string GetFieldIndexMethod(FieldDefinition field)
-        {
-            return field.TypeSelector switch
+        public static string GetFieldIndexMethod(FieldDefinition field) =>
+            field.TypeSelector switch
             {
                 FieldType.Map => "IndexObject",
 
@@ -373,7 +382,6 @@ namespace Improbable.CSharpCodeGen
 
                 _ => throw new ArgumentOutOfRangeException()
             };
-        }
 
         public static string TypeToFilename(string qualifiedName)
         {
@@ -388,25 +396,25 @@ namespace Improbable.CSharpCodeGen
             return t.Annotations.Any(a => a.TypeValue.Type == attributeName);
         }
 
-        public static bool IsFieldRecursive(TypeDescription type, FieldDefinition field)
-        {
-            return field.TypeSelector switch
+        public static bool IsFieldRecursive(TypeDescription type, FieldDefinition field) =>
+#nullable disable
+            field.TypeSelector switch
             {
                 FieldType.Map => (field.MapType.KeyType.HasCustomType(type.QualifiedName) || field.MapType.ValueType.HasCustomType(type.QualifiedName)),
                 _ => field.HasCustomType(type.QualifiedName)
             };
-        }
+#nullable restore
 
-        public static string GetTypeReferenceGetter(TypeReference type)
-        {
-            return type.ValueTypeSelector switch
+        public static string GetTypeReferenceGetter(TypeReference type) =>
+#nullable disable
+            type.ValueTypeSelector switch
             {
                 ValueType.Enum => "GetEnum",
                 ValueType.Primitive => $"Get{type.Primitive}",
                 ValueType.Type => "GetObject",
                 _ => throw new ArgumentOutOfRangeException()
             };
-        }
+#nullable restore
 
         public static PrimitiveType InnerPrimitiveType(this FieldDefinition field)
         {
@@ -415,6 +423,7 @@ namespace Improbable.CSharpCodeGen
                 throw new InvalidOperationException("Called on field without a primitive type.");
             }
 
+#nullable disable
             return field.TypeSelector switch
             {
                 FieldType.Option => field.OptionType.InnerType.Primitive,
@@ -423,12 +432,13 @@ namespace Improbable.CSharpCodeGen
                 FieldType.Singular => field.SingularType.Type.Primitive,
                 _ => throw new ArgumentOutOfRangeException()
             };
+#nullable restore
         }
 
 
-        public static string InnerFqn(this FieldDefinition field)
-        {
-            return field.TypeSelector switch
+        public static string InnerFqn(this FieldDefinition field) =>
+#nullable disable
+            field.TypeSelector switch
             {
                 FieldType.Option => field.OptionType.InnerType.Fqn(),
                 FieldType.List => field.ListType.InnerType.Fqn(),
@@ -436,7 +446,7 @@ namespace Improbable.CSharpCodeGen
                 FieldType.Singular => field.SingularType.Type.Fqn(),
                 _ => throw new ArgumentOutOfRangeException()
             };
-        }
+#nullable restore
 
         public static string Namespace(this EnumDefinition type) => Case.Namespace(type.QualifiedName);
 

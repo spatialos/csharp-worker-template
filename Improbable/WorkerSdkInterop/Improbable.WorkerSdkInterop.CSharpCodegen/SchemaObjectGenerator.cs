@@ -126,12 +126,14 @@ internal {typeName}(global::Improbable.Worker.CInterop.SchemaObject fields)
         {GetApplyToSchemaObjectValueStatement(field, "value")}
 }}",
 
+#nullable disable
                     FieldType.Map => $@"foreach(var kv in {fieldName})
 {{
         var kvPair = fields.AddObject({field.FieldId});
         {GetApplyMapObject(field.MapType.KeyType, SchemaMapKeyFieldId)}
         {GetApplyMapObject(field.MapType.ValueType, SchemaMapValueFieldId)}
 }}",
+#nullable restore
                     FieldType.Singular => $"{GetApplyToSchemaObjectValueStatement(field, fieldName)}",
                     _ => throw new ArgumentOutOfRangeException()
                 };
@@ -231,7 +233,7 @@ else
         {GetContainerAddStatement(type, field, fieldName, GetAssignmentInstantiation(field))}
     }}
 }}",
-
+#nullable disable
                 FieldType.Map => $@"{{
     var count = fields.{fieldCount}({field.FieldId});
         var local = {GetEmptyCollection(type, field)};
@@ -243,6 +245,7 @@ else
         {GetContainerAddStatement(type, field, fieldName, $"{GetMapObjectAssignment(field.MapType.KeyType, SchemaMapKeyFieldId)}, {GetMapObjectAssignment(field.MapType.ValueType, SchemaMapValueFieldId)}")};
     }}
 }}",
+#nullable restore
                 FieldType.Singular => $"{fieldName} = {GetAssignmentInstantiation(field)};",
 
                 _ => throw new ArgumentOutOfRangeException()
@@ -406,6 +409,7 @@ if (!any)
 }}",
 
                     // =======
+#nullable disable
                     FieldType.Map => $@"var any = false;
 if (newValue != null)
 {{
@@ -422,6 +426,7 @@ if (!any)
 {{
     update.AddClearedField({field.FieldId});
 }}",
+#nullable restore
 
                     // =======
                     FieldType.Singular => GetUpdateValueStatement(field, "newValue"),
@@ -442,7 +447,7 @@ internal static void Update{field.PascalCase()}({SchemaComponentUpdate} update, 
 
         private static string GenerateCreateGetEvents(IReadOnlyCollection<ComponentDefinition.EventDefinition> events)
         {
-            if (events == null || events.Count == 0)
+            if (events.Count == 0)
             {
                 return string.Empty;
             }

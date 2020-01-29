@@ -1,5 +1,5 @@
 using System;
-using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Diagnostics;
 
 namespace Improbable.Schema.Bundle
@@ -35,9 +35,9 @@ namespace Improbable.Schema.Bundle
 
     public class TypeReference
     {
-        public string Enum;
+        public string? Enum;
         public PrimitiveType Primitive;
-        public string Type;
+        public string? Type;
 
         public ValueType ValueTypeSelector
         {
@@ -65,79 +65,82 @@ namespace Improbable.Schema.Bundle
 
     public class Value
     {
-        public bool BoolValue;
-        public string BytesValue;
-        public double DoubleValue;
-        public long EntityIdValue;
-        public SchemaEnumValue EnumValue;
-        public float FloatValue;
-        public int Int32Value;
-        public long Int64Value;
-        public ListValueHolder ListValue;
-        public MapValueHolder MapValue;
-        public OptionValueHolder OptionValue;
-        public SourceReference SourceReference;
-        public string StringValue;
-        public TypeValue TypeValue;
-        public uint Uint32Value;
-        public ulong Uint64Value;
+        public bool? BoolValue;
+        public string? BytesValue;
+        public double? DoubleValue;
+        public long? EntityIdValue;
+        public SchemaEnumValue? EnumValue;
+        public float? FloatValue;
+        public int? Int32Value;
+        public long? Int64Value;
+        public ListValueHolder? ListValue;
+        public MapValueHolder? MapValue;
+        public OptionValueHolder? OptionValue;
+        public SourceReference? SourceReference;
+        public string? StringValue;
+        public TypeValue? TypeValue;
+        public uint? Uint32Value;
+        public ulong? Uint64Value;
 
         public class OptionValueHolder
         {
-            public Value Value;
+            public Value Value = new Value();
         }
 
         public class ListValueHolder
         {
-            public IReadOnlyList<Value> Values;
+            public ImmutableArray<Value> Values = ImmutableArray<Value>.Empty;
         }
 
         public class MapValueHolder
         {
-            public IReadOnlyList<MapPairValue> Values;
+            public ImmutableArray<MapPairValue> Values = ImmutableArray<MapPairValue>.Empty;
 
             public class MapPairValue
             {
-                public Value Key;
-                public Value Value;
+                public Value Key = new Value();
+                public Value Value = new Value();
             }
         }
     }
 
     public class SchemaEnumValue
     {
-        public string Enum;
-        public string EnumValue;
+        public string Enum = string.Empty;
+        public string EnumValue = string.Empty;
 
-        public string Name;
-        public string Value;
+        public string Name = string.Empty;
+        public string Value = string.Empty;
     }
 
+    [DebuggerDisplay("{" + nameof(Type) + "}")]
     public class TypeValue
     {
-        public IReadOnlyList<FieldValue> Fields;
+        public ImmutableArray<FieldValue> Fields = ImmutableArray<FieldValue>.Empty;
 
-        public string Type;
+        public string Type = string.Empty;
 
+        [DebuggerDisplay("{" + nameof(Name) + "}")]
         public class FieldValue
         {
-            public string Name;
-            public SourceReference SourceReference;
-            public Value Value;
+            public string Name = string.Empty;
+            public SourceReference SourceReference = new SourceReference();
+            public Value Value = new Value();
         }
     }
 
+    [DebuggerDisplay("{" + nameof(TypeValue) + "}")]
     public class Annotation
     {
-        public SourceReference SourceReference;
-        public TypeValue TypeValue;
+        public SourceReference SourceReference = new SourceReference();
+        public TypeValue TypeValue = new TypeValue();
     }
 
     public class EnumValueDefinition
     {
-        public IReadOnlyList<Annotation> Annotations;
-        public string Name;
-        public SourceReference SourceReference;
+        public ImmutableArray<Annotation> Annotations = ImmutableArray<Annotation>.Empty;
+        public string Name = string.Empty;
+        public SourceReference SourceReference = new SourceReference();
 
         public uint Value;
     }
@@ -145,12 +148,12 @@ namespace Improbable.Schema.Bundle
     [DebuggerDisplay("{" + nameof(QualifiedName) + "}")]
     public class EnumDefinition
     {
-        public IReadOnlyList<Annotation> Annotations;
-        public string Name;
-        public string OuterType;
-        public string QualifiedName;
-        public SourceReference SourceReference;
-        public IReadOnlyList<EnumValueDefinition> Values;
+        public ImmutableArray<Annotation> Annotations = ImmutableArray<Annotation>.Empty;
+        public string Name = string.Empty;
+        public string OuterType = string.Empty;
+        public string QualifiedName = string.Empty;
+        public SourceReference SourceReference = new SourceReference();
+        public ImmutableArray<EnumValueDefinition> Values = ImmutableArray<EnumValueDefinition>.Empty;
     }
 
     public enum FieldType
@@ -164,17 +167,18 @@ namespace Improbable.Schema.Bundle
     [DebuggerDisplay("{" + nameof(Name) + "}" + " ({" + nameof(FieldId) + "})")]
     public class FieldDefinition
     {
-        public IReadOnlyList<Annotation> Annotations;
+        public ImmutableArray<Annotation> Annotations = ImmutableArray<Annotation>.Empty;
 
-        public string Name;
+        public string Name = string.Empty;
         public uint FieldId;
 
-        public ListTypeRef ListType;
-        public MapTypeRef MapType;
-        public OptionTypeRef OptionType;
-        public SingularTypeRef SingularType;
+        public ListTypeRef? ListType;
 
-        public SourceReference SourceReference;
+        public MapTypeRef? MapType;
+        public OptionTypeRef? OptionType;
+        public SingularTypeRef? SingularType;
+
+        public SourceReference SourceReference = new SourceReference();
 
         public bool Transient;
 
@@ -208,73 +212,73 @@ namespace Improbable.Schema.Bundle
 
         public class SingularTypeRef
         {
-            public TypeReference Type;
+            public TypeReference Type = new TypeReference();
         }
 
         public class OptionTypeRef
         {
-            public TypeReference InnerType;
+            public TypeReference InnerType = new TypeReference();
         }
 
         public class ListTypeRef
         {
-            public TypeReference InnerType;
+            public TypeReference InnerType = new TypeReference();
         }
 
         public class MapTypeRef
         {
-            public TypeReference KeyType;
-            public TypeReference ValueType;
+            public TypeReference KeyType = new TypeReference();
+            public TypeReference ValueType = new TypeReference();
         }
     }
 
     [DebuggerDisplay("{" + nameof(QualifiedName) + "}")]
     public class TypeDefinition
     {
-        public IReadOnlyList<Annotation> Annotations;
-        public IReadOnlyList<FieldDefinition> Fields;
-        public string Name;
-        public string OuterType;
-        public string QualifiedName;
-        public SourceReference SourceReference;
+        public ImmutableArray<Annotation> Annotations = ImmutableArray<Annotation>.Empty;
+        public ImmutableArray<FieldDefinition> Fields = ImmutableArray<FieldDefinition>.Empty;
+        public string Name = string.Empty;
+        public string OuterType = string.Empty;
+        public string QualifiedName = string.Empty;
+        public SourceReference SourceReference = new SourceReference();
     }
 
     [DebuggerDisplay("{" + nameof(QualifiedName) + "} {" + nameof(ComponentId) + "}")]
     public class ComponentDefinition
     {
-        public IReadOnlyList<Annotation> Annotations;
-        public IReadOnlyList<CommandDefinition> Commands;
+        public ImmutableArray<Annotation> Annotations = ImmutableArray<Annotation>.Empty;
+        public ImmutableArray<CommandDefinition> Commands = ImmutableArray<CommandDefinition>.Empty;
         public uint ComponentId;
 
-        public string DataDefinition;
-        public IReadOnlyList<EventDefinition> Events;
+        public string DataDefinition = string.Empty;
+        public ImmutableArray<EventDefinition> Events = ImmutableArray<EventDefinition>.Empty;
 
-        public IReadOnlyList<FieldDefinition> Fields;
-        public string Name;
+        public ImmutableArray<FieldDefinition> Fields = ImmutableArray<FieldDefinition>.Empty;
+        public string Name = string.Empty;
 
-        public string QualifiedName;
-        public SourceReference SourceReference;
+        public string QualifiedName = string.Empty;
+        public SourceReference SourceReference = new SourceReference();
 
         [DebuggerDisplay("{" + nameof(QualifiedName) + "}")]
         public class EventDefinition
         {
-            public IReadOnlyList<Annotation> Annotations;
+            public ImmutableArray<Annotation> Annotations = ImmutableArray<Annotation>.Empty;
             public uint EventIndex;
-            public string Name;
-            public SourceReference SourceReference;
-            public string Type;
+            public string Name = string.Empty;
+            public SourceReference SourceReference = new SourceReference();
+            public string Type = string.Empty;
         }
 
         [DebuggerDisplay("{" + nameof(QualifiedName) + "}" + " {" + nameof(CommandIndex) + "}")]
         public class CommandDefinition
         {
-            public IReadOnlyList<Annotation> Annotations;
+            public ImmutableArray<Annotation> Annotations = ImmutableArray<Annotation>.Empty;
             public uint CommandIndex;
 
-            public string Name;
-            public string RequestType;
-            public string ResponseType;
-            public SourceReference SourceReference;
+            public string Name = string.Empty;
+            public string RequestType = string.Empty;
+            public string ResponseType = string.Empty;
+            public SourceReference SourceReference = new SourceReference();
         }
     }
 
@@ -286,28 +290,28 @@ namespace Improbable.Schema.Bundle
 
     public class SchemaBundle
     {
-        public IReadOnlyList<SchemaFile> SchemaFiles;
+        public ImmutableArray<SchemaFile> SchemaFiles = ImmutableArray<SchemaFile>.Empty;
     }
 
     public class Package
     {
-        public string Name;
-        public SourceReference SourceReference;
+        public string Name = string.Empty;
+        public SourceReference SourceReference = new SourceReference();
     }
 
     public class Import
     {
-        public string Path;
-        public SourceReference SourceReference;
+        public string Path = string.Empty;
+        public SourceReference SourceReference = new SourceReference();
     }
 
     public class SchemaFile
     {
-        public string CanonicalPath;
-        public IReadOnlyList<ComponentDefinition> Components;
-        public IReadOnlyList<EnumDefinition> Enums;
-        public IReadOnlyList<Import> Imports;
-        public Package Package;
-        public IReadOnlyList<TypeDefinition> Types;
+        public string CanonicalPath = string.Empty;
+        public ImmutableArray<ComponentDefinition> Components = ImmutableArray<ComponentDefinition>.Empty;
+        public ImmutableArray<EnumDefinition> Enums = ImmutableArray<EnumDefinition>.Empty;
+        public ImmutableArray<Import> Imports = ImmutableArray<Import>.Empty;
+        public Package Package = new Package();
+        public ImmutableArray<TypeDefinition> Types = ImmutableArray<TypeDefinition>.Empty;
     }
 }

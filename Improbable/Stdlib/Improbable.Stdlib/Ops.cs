@@ -10,7 +10,7 @@ namespace Improbable.Stdlib
     {
         public readonly List<Op> Ops;
 
-        private readonly Worker.CInterop.OpList rawOps;
+        private readonly Worker.CInterop.OpList? rawOps;
 
         public static OpList Empty = new OpList();
 

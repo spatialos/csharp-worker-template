@@ -17,27 +17,28 @@ namespace Improbable.Stdlib
     public class WorkerConnection : IDisposable
     {
         private readonly ConcurrentDictionary<long, TaskHandler> requestsToComplete = new ConcurrentDictionary<long, TaskHandler>();
-        private Connection connection;
-        private Task metricsTask;
-        private CancellationTokenSource metricsCts = new CancellationTokenSource();
+        private readonly Connection connection;
+        private Task? metricsTask;
+        private CancellationTokenSource? metricsCts;
         private readonly object connectionLock = new object();
         private readonly CancellationTokenSource processOpsCts = new CancellationTokenSource();
         private readonly BlockingCollection<OpList> ops = new BlockingCollection<OpList>();
-        private Task processOpsTask;
+        private readonly Task processOpsTask;
 
         public string WorkerId { get; }
 
         private WorkerConnection(Connection connection)
         {
-            this.connection = connection ?? throw new ArgumentNullException(nameof(connection));
+            this.connection = connection;
+
             WorkerId = connection.GetWorkerId();
 
-            StartBackgroundOpsGathering();
+            processOpsTask = StartBackgroundOpsGathering();
         }
 
-        private void StartBackgroundOpsGathering()
+        private Task StartBackgroundOpsGathering()
         {
-            processOpsTask = Task.Factory.StartNew(() =>
+            return Task.Factory.StartNew(() =>
             {
                 // We have to resort to polling here since connection.GetOpList doesn't provide a means of cancellation
                 try
@@ -91,8 +92,7 @@ namespace Improbable.Stdlib
                 StopSendingMetrics();
                 CancelCommands();
 
-                connection?.Dispose();
-                connection = null;
+                connection.Dispose();
             }
         }
 
@@ -150,7 +150,12 @@ namespace Improbable.Stdlib
             using var future = locator.ConnectAsync(connectionParameters);
             var connection = await future.ToTask(cancellation).ConfigureAwait(false);
 
-            if (connection != null && connection.GetConnectionStatusCode() != ConnectionStatusCode.Success)
+            if (connection == null)
+            {
+                throw new Exception("Connection is null");
+            }
+
+            if (connection.GetConnectionStatusCode() != ConnectionStatusCode.Success)
             {
                 throw new Exception($"{connection.GetConnectionStatusCode()}: {connection.GetConnectionStatusCodeDetailString()}");
             }
@@ -165,12 +170,16 @@ namespace Improbable.Stdlib
                 throw new InvalidOperationException("Metrics are already being sent");
             }
 
+            metricsCts = new CancellationTokenSource();
+
             metricsTask = Task.Factory.StartNew(async unused =>
             {
                 var metrics = new Metrics();
 
                 while (!metricsCts.IsCancellationRequested)
                 {
+                    metricsCts.Token.ThrowIfCancellationRequested();
+
                     foreach (var updater in updaterList)
                     {
                         updater.Invoke(metrics);
@@ -188,18 +197,27 @@ namespace Improbable.Stdlib
                         connection.SendMetrics(metrics);
                     }
 
-                    await Task.Delay(TimeSpan.FromSeconds(5), metricsCts.Token).ConfigureAwait(false);
+                    await Task.Delay(TimeSpan.FromSeconds(5), metricsCts.Token).ConfigureAwait(false); ;
                 }
-            }, metricsCts.Token, TaskCreationOptions.LongRunning);
+            }, metricsCts.Token);
         }
 
         public void StopSendingMetrics()
         {
             metricsCts?.Cancel();
+            try
+            {
+                metricsTask?.Wait();
+            }
+            catch
+            {
+                // Do nothing
+            }
+
             metricsCts?.Dispose();
+            metricsCts = null;
 
             metricsTask = null;
-            metricsCts = null;
         }
 
         private static string GetDevelopmentPlayerIdentityToken(string host, ushort port, bool useInsecureConnection, string authToken, string playerId, string displayName)
@@ -288,7 +306,7 @@ namespace Improbable.Stdlib
                 requestId = connection.SendCommandRequest(entityId.Value, new CommandRequest(componentId, commandIndex, request), timeout, parameters);
             }
 
-            if (!requestsToComplete.TryAdd(requestId, new TaskHandler { Complete = complete, Fail = fail }))
+            if (!requestsToComplete.TryAdd(requestId, new TaskHandler(complete, fail)))
             {
                 throw new InvalidOperationException("Key already exists");
             }
@@ -373,7 +391,7 @@ namespace Improbable.Stdlib
                 completion.TrySetException(new CommandFailedException(code, message));
             }
 
-            if (!requestsToComplete.TryAdd(id, new TaskHandler { Complete = Complete, Fail = Fail }))
+            if (!requestsToComplete.TryAdd(id, new TaskHandler(Complete, Fail)))
             {
                 throw new InvalidOperationException("Key already exists");
             }
@@ -658,8 +676,14 @@ namespace Improbable.Stdlib
 
         private class TaskHandler
         {
-            public Action<CommandResponses> Complete;
-            public Action<StatusCode, string> Fail;
+            public Action<CommandResponses> Complete { get; private set; }
+            public Action<StatusCode, string> Fail { get; private set; }
+
+            public TaskHandler(Action<CommandResponses> complete, Action<StatusCode, string> fail)
+            {
+                Complete = complete;
+                Fail = fail;
+            }
         }
     }
 }

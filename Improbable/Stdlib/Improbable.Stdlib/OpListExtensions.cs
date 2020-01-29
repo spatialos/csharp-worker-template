@@ -131,7 +131,7 @@ namespace Improbable.Stdlib
             return ops.Where(op => op.Response.ComponentId == componentId);
         }
 
-        private static unsafe TDest ReinterpretCast<TSource, TDest>(TSource source)
+        private static unsafe TDest ReinterpretCast<TSource, TDest>(TSource source) where TDest : struct
         {
             var sourceRef = __makeref(source);
             var dest = default(TDest);

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 
 namespace Improbable.Schema.Bundle
@@ -6,25 +7,24 @@ namespace Improbable.Schema.Bundle
     public readonly struct Bundle
     {
         public SchemaBundle SchemaBundle { get; }
-        public IReadOnlyDictionary<string, TypeDefinition> Types { get; }
-        public IReadOnlyDictionary<string, EnumDefinition> Enums { get; }
-        public IReadOnlyDictionary<string, ComponentDefinition> Components { get; }
-        public IReadOnlyDictionary<string, SchemaFile> TypeToFile { get; }
-        public IReadOnlyList<string> CommandTypes { get; }
+        public ImmutableDictionary<string, TypeDefinition> Types { get; }
+        public ImmutableDictionary<string, EnumDefinition> Enums { get; }
+        public ImmutableDictionary<string, ComponentDefinition> Components { get; }
+        public ImmutableDictionary<string, SchemaFile> TypeToFile { get; }
+        public ImmutableArray<string> CommandTypes { get; }
 
         public Bundle(SchemaBundle bundle)
         {
             SchemaBundle = bundle;
 
-            Components = bundle.SchemaFiles.SelectMany(f => f.Components).ToDictionary(c => c.QualifiedName, c => c);
-            Types = bundle.SchemaFiles.SelectMany(f => f.Types).ToDictionary(t => t.QualifiedName, t => t);
-            Enums = bundle.SchemaFiles.SelectMany(f => f.Enums).ToDictionary(t => t.QualifiedName, t => t);
-            CommandTypes = bundle.SchemaFiles.SelectMany(f => f.Components)
+            Components = ImmutableDictionary.CreateRange(bundle.SchemaFiles.SelectMany(f => f.Components).ToDictionary(c => c.QualifiedName, c => c));
+            Types = ImmutableDictionary.CreateRange(bundle.SchemaFiles.SelectMany(f => f.Types).ToDictionary(t => t.QualifiedName, t => t));
+            Enums = ImmutableDictionary.CreateRange(bundle.SchemaFiles.SelectMany(f => f.Enums).ToDictionary(t => t.QualifiedName, t => t));
+            CommandTypes = ImmutableArray.CreateRange(bundle.SchemaFiles.SelectMany(f => f.Components)
                 .SelectMany(c => c.Commands)
-                .SelectMany(cmd => new[] { cmd.RequestType, cmd.ResponseType }).ToList();
+                .SelectMany(cmd => new[] { cmd.RequestType, cmd.ResponseType }).ToList());
 
             var fileNameDict = new Dictionary<string, SchemaFile>();
-            TypeToFile = fileNameDict;
 
             foreach (var file in bundle.SchemaFiles)
             {
@@ -43,6 +43,8 @@ namespace Improbable.Schema.Bundle
                     fileNameDict[type.QualifiedName] = file;
                 }
             }
+
+            TypeToFile = ImmutableDictionary.CreateRange(fileNameDict);
         }
     }
 }
