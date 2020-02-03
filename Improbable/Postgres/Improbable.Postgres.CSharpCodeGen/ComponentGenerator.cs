@@ -12,6 +12,36 @@ namespace Improbable.Postgres.CSharpCodeGen
 {
     public class ComponentGenerator : ICodeGenerator
     {
+        private readonly string tableName;
+
+        public ComponentGenerator(string tableName)
+        {
+            if (string.IsNullOrEmpty(tableName))
+            {
+                throw new ArgumentNullException(nameof(tableName));
+            }
+
+            this.tableName = tableName;
+        }
+
+        private static string FormatFieldValue(FieldDefinition field)
+        {
+            var name = $"value.{field.PascalCase()}";
+
+            return field.TypeSelector switch
+            {
+                FieldType.Option when field.HasPrimitive(PrimitiveType.String) => $@"{name}.HasValue ? '{{{name}.Value}}' : ""null""",
+                FieldType.Option when field.HasEnum() => $@"{name}.HasValue ? (int) {{{name}.Value}} : ""null""",
+                FieldType.Option => $@"{name}.HasValue ? '{{{name}.Value}}' : ""null""",
+
+                FieldType.Singular when field.HasPrimitive(PrimitiveType.String) => $@"'{{{name}}}'",
+                FieldType.Singular when field.HasEnum() => $@"(int) {{{name}}}",
+                FieldType.Singular => $@"{{{name}}}",
+
+                _ => throw new ArgumentOutOfRangeException()
+            };
+        }
+
         public string Generate(TypeDescription type)
         {
             if (!HasAnnotation(type, WellKnownAnnotations.CreateTableAttribute))
@@ -19,78 +49,35 @@ namespace Improbable.Postgres.CSharpCodeGen
                 return string.Empty;
             }
 
-            var setupCommands = type.Annotations.GetAnnotationStrings(WellKnownAnnotations.CreateTableAttribute, 0);
-
-            var primaryKeyFields = type.Fields.WithAnnotation(WellKnownAnnotations.PrimaryKeyAttribute).ToList();
-            if (primaryKeyFields.Count == 0)
-            {
-                throw new Exception($"{type.QualifiedName} is exposed to the database, but no fields are marked with [{WellKnownAnnotations.PrimaryKeyAttribute}]");
-            }
-
-            var columnCreator = CreateColumns(type.QualifiedName, type.Fields);
-
-            var primaryKeyColumnNames = string.Join(", ", primaryKeyFields.Select(f => $@"{f.Name}"));
-            var primaryKey = $"PRIMARY KEY ({primaryKeyColumnNames})";
-
             var selectClause = string.Join(", ", type.Fields.Select(f => $@"{f.Name}{PostgresTypeConversion(f)}"));
+            var insertClause = type.Fields.Select(FormatFieldValue);
             var ordinal = 0;
-
-            var indexFields = type.Fields.WithAnnotation(WellKnownAnnotations.IndexAttribute);
-
+            
             var typeName = $"{type.Fqn()}";
 
-            return $@"public static string CreateTypeTable(string tableName)
-{{
-    return $@""CREATE TABLE {{tableName}} (
-{Indent(2, columnCreator.TrimEnd())}
-{Indent(2, primaryKey)}
-    );"";
-}}
-
-public static {typeName} FromQuery(global::Npgsql.NpgsqlDataReader reader)
-{{
-    return new {typeName} (
+            return $@"
+public static {typeName} FromQuery(global::Npgsql.NpgsqlDataReader reader) =>
+    new {typeName} (
 {Indent(2, CreateReader(type, type.Fields)).TrimEnd()}
     );
-}}
 
 public const string SelectClause = ""{selectClause}"";
 
-{string.Join(Environment.NewLine, type.Fields.Select(f => $"public const int {SnakeCaseToPascalCase(f.Name)}Ordinal = {ordinal++};"))}
+{string.Join(Environment.NewLine, type.Fields.Select(f => $"public const int {f.PascalCase()}Ordinal = {ordinal++};"))}
+
+public static string ComponentToDatabase(in {type.Fqn()} value)
+{{
+    return (
+        $@""INSERT INTO {tableName} ({string.Join(",", type.Fields.Select(f => f.Name))}) VALUES ({string.Join(",", insertClause)});""
+    );
+}}
 
 public struct DatabaseChangeNotification
 {{
     public {type.Fqn()}? Old {{ get; set; }}
 
     public {type.Fqn()} New {{ get; set; }}
-}}
-
-public static string InitializeDatabase(string tableName)
-{{
-    return $@""
-{string.Join(Environment.NewLine, setupCommands)}
-
-{{CreateTypeTable(tableName)}}
-
-{string.Join(Environment.NewLine, indexFields.Select(f => f.Annotations.GetAnnotationString(WellKnownAnnotations.IndexAttribute, 0).Replace("{fieldName}", f.Name)))}
-
--- Setup change notifications. This maps to the DatabaseChangeNotification class.
-CREATE OR REPLACE FUNCTION notify_{{tableName}}() RETURNS TRIGGER AS $$
-    BEGIN
-        IF TG_OP = 'UPDATE' THEN
-            PERFORM pg_notify( '{{tableName}}'::text, json_build_object( 'old', row_to_json(OLD), 'new', row_to_json(NEW) )::text);
-        ELSE
-            PERFORM pg_notify( '{{tableName}}'::text, json_build_object( 'new', row_to_json(NEW) )::text);
-        END IF;
-        RETURN NEW;
-    END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER notify_{{tableName}}_tgr
-    AFTER INSERT OR UPDATE on {{tableName}}
-    FOR EACH ROW EXECUTE PROCEDURE notify_{{tableName}}();"";
-}}
-";
+}}";
         }
 
         private static string CreateReader(TypeDescription type, IEnumerable<FieldDefinition> fields)
@@ -160,7 +147,7 @@ CREATE TRIGGER notify_{{tableName}}_tgr
                     };
                 }
 
-                databaseType = databaseType.Replace("{fieldName}", SnakeCaseToPascalCase(field.Name));
+                databaseType = databaseType.Replace("{fieldName}", field.PascalCase());
 
                 if (string.IsNullOrEmpty(databaseType))
                 {
@@ -173,6 +160,54 @@ CREATE TRIGGER notify_{{tableName}}_tgr
             }
 
             return columnCreator.ToString().TrimEnd();
+        }
+
+        public string GenerateSql(TypeDescription type)
+        {
+            if (!HasAnnotation(type, WellKnownAnnotations.CreateTableAttribute))
+            {
+                return string.Empty;
+            }
+
+            var setupCommands = type.Annotations.GetAnnotationStrings(WellKnownAnnotations.CreateTableAttribute, 0);
+
+            var primaryKeyFields = type.Fields.WithAnnotation(WellKnownAnnotations.PrimaryKeyAttribute).ToList();
+            if (primaryKeyFields.Count == 0)
+            {
+                throw new Exception($"{type.QualifiedName} is exposed to the database, but no fields are marked with [{WellKnownAnnotations.PrimaryKeyAttribute}]");
+            }
+
+            var columnCreator = CreateColumns(type.QualifiedName, type.Fields);
+
+            var primaryKeyColumnNames = string.Join(", ", primaryKeyFields.Select(f => $@"{f.Name}"));
+            var primaryKey = $"PRIMARY KEY ({primaryKeyColumnNames})";
+
+            var indexFields = type.Fields.WithAnnotation(WellKnownAnnotations.IndexAttribute);
+
+            return $@"{string.Join(Environment.NewLine, setupCommands)}
+CREATE TABLE {tableName} (
+{columnCreator.TrimEnd()}
+{primaryKey}
+);
+
+{string.Join(Environment.NewLine, indexFields.Select(f => f.Annotations.GetAnnotationString(WellKnownAnnotations.IndexAttribute, 0).Replace("{fieldName}", f.Name)))}
+
+-- Setup change notifications. This maps to the DatabaseChangeNotification class.
+CREATE OR REPLACE FUNCTION notify_{tableName}() RETURNS TRIGGER AS $$
+    BEGIN
+        IF TG_OP = 'UPDATE' THEN
+            PERFORM pg_notify( '{tableName}'::text, json_build_object( 'old', row_to_json(OLD), 'new', row_to_json(NEW) )::text);
+        ELSE
+            PERFORM pg_notify( '{tableName}'::text, json_build_object( 'new', row_to_json(NEW) )::text);
+        END IF;
+        RETURN NEW;
+    END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER notify_{tableName}_tgr
+    AFTER INSERT OR UPDATE on {tableName}
+    FOR EACH ROW EXECUTE PROCEDURE notify_{tableName}();
+".Replace("{tableName}", tableName);
         }
     }
 }

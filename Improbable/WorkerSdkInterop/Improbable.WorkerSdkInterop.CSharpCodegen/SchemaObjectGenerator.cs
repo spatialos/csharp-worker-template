@@ -572,7 +572,7 @@ public static bool TryGetEvents({SchemaComponentUpdate} update{parameters})
             parameters.Append(string.Join(", ", fields.Select(f => $"{f.ParameterType()} {f.CamelCase()} = default")));
             initializers.AppendLine(string.Join(Environment.NewLine, fields.Select(f =>
             {
-                var name = SnakeCaseToPascalCase(f.Name);
+                var name = f.PascalCase();
 
                 // Allow `null` to represent an empty collection.
                 if (f.IsList() || f.IsMap())

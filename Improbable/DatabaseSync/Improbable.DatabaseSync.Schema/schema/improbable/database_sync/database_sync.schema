@@ -42,7 +42,8 @@ enum CommandErrors {
 // DatabaseSyncItem is what is stored in the database.
 // Any changes to this type should also be reflected in DatabaseSyncGenerator.cs
 [improbable.postgres.CreateTableAttribute([
-    "CREATE EXTENSION IF NOT EXISTS ltree;"
+    "CREATE EXTENSION IF NOT EXISTS ltree;",
+    "CREATE TABLE metrics (time TIMESTAMP, name VARCHAR, value INT);"
 ])]
 type DatabaseSyncItem {
     // A user-defined string.

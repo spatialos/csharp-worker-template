@@ -38,7 +38,7 @@ namespace Improbable.DatabaseSync.CSharpCodeGen
                 throw new InvalidOperationException($"{profileIdField.Name} is annotated with {ProfileIdAnnotation}, which requires it to be a string type.");
             }
 
-            var profileFieldName = SnakeCaseToPascalCase(profileIdField.Name);
+            var profileFieldName = profileIdField.PascalCase();
 
             var sb = new StringBuilder();
 
@@ -67,9 +67,9 @@ public static {SchemaComponentUpdate} Hydrate({GenericIEnumerable}<{DatabaseSync
         // Update count and list fields.
         switch(item.Name)
         {{
-{string.Join("\n", valueFields.Select(field => Indent(3, $"case {DatabaseSyncFieldName(field)}: update.Set{FieldName(field)}(item.Count); break;")))}
+{string.Join("\n", valueFields.Select(field => Indent(3, $"case {DatabaseSyncFieldName(field)}: update.Set{field.PascalCase()}(item.Count); break;")))}
 {string.Join("\n", listFields.Select(field => Indent(3, $@"case {DatabaseSyncFieldName(field)}:
-update.Set{FieldName(field)}({enumerable}.ToArray({enumerable}.Where(items,  i => {isImmediateChild}(i.Path, item.Path))));
+update.Set{field.PascalCase()}({enumerable}.ToArray({enumerable}.Where(items,  i => {isImmediateChild}(i.Path, item.Path))));
 break;")))}
         }}
     }}
@@ -78,10 +78,7 @@ break;")))}
 }}
 
 [global::Improbable.DatabaseSync.ProfileIdFromSchemaData]
-public static string GetProfileIdFromComponentData(global::Improbable.Worker.CInterop.SchemaObject fields)
-{{
-    return fields.GetString({profileIdField.FieldId});
-}}
+public static string GetProfileIdFromComponentData(global::Improbable.Worker.CInterop.SchemaObject fields) => fields.GetString({profileIdField.FieldId});
 
 public static string ComponentToDatabase(string databaseName, in {type.Fqn()} item)
 {{
@@ -89,19 +86,14 @@ public static string ComponentToDatabase(string databaseName, in {type.Fqn()} it
     {{
         throw new global::System.ArgumentNullException(nameof(item.{profileFieldName}));
     }}
-    return $@""{string.Join("\n", valueFields.Select(field => $"{insertStatement} values('{{item.{profileFieldName}}}.{{{PathFieldName(field)}}}', '{{{DatabaseSyncFieldName(field)}}}', {{item.{FieldName(field)}}});"))}
+    return $@""{string.Join("\n", valueFields.Select(field => $"{insertStatement} values('{{item.{profileFieldName}}}.{{{PathFieldName(field)}}}', '{{{DatabaseSyncFieldName(field)}}}', {{item.{field.PascalCase()}}});"))}
 {string.Join("\n", listFields.Select(field => $"{insertStatement} values('{{item.{profileFieldName}}}.{{{PathFieldName(field)}}}', '{{{DatabaseSyncFieldName(field)}}}', 0);"))}"";
 }}
 
 [global::Improbable.DatabaseSync.ProfileId]
 public string DatabaseSyncProfileId => {profileFieldName};
 
-{
-                    string.Join("\n", exposedFields.Select(field => $@"public string {FieldName(field)}Path()
-{{
-    return {profileFieldName} + ""."" + {PathFieldName(field)};
-}}
-"))
+{string.Join("\n", exposedFields.Select(field => $@"public string {field.PascalCase()}Path() => {profileFieldName} + ""."" + {PathFieldName(field)};"))
                 }");
             return sb.ToString().TrimEnd();
         }
@@ -111,14 +103,9 @@ public string DatabaseSyncProfileId => {profileFieldName};
             return $"[global::Newtonsoft.Json.JsonProperty(\"{field.Name}\")]";
         }
 
-        private static string FieldName(FieldDefinition field)
-        {
-            return $"{SnakeCaseToPascalCase(field.Name)}";
-        }
-
         private static string DatabaseSyncFieldName(FieldDefinition field)
         {
-            return $"DatabaseSync{FieldName(field)}";
+            return $"DatabaseSync{field.PascalCase()}";
         }
 
         private static string PathFieldName(FieldDefinition field)

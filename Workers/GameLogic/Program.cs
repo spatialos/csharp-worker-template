@@ -1,20 +1,32 @@
 using System;
 using System.IO;
-using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
-using CommandLine;
 using Improbable.Stdlib;
 using Improbable.Worker.CInterop;
+using McMaster.Extensions.CommandLineUtils;
 using Serilog;
 using OpList = Improbable.Stdlib.OpList;
 
 namespace GameLogic
 {
-    internal class Program
+    internal class Program : IReceptionistOptions
     {
         private const string WorkerType = "GameLogic";
 
-        private static async Task<int> Main(string[] args)
+        [Option("--worker-name", Description = "The name of the worker connecting to SpatialOS.")]
+        public string? WorkerName { get; set; }
+
+        [Option("--logfile", Description = "The full path to a logfile.")]
+        public string? LogFileName { get; set; }
+
+        [Option("spatialos-host", Description = "The host to use to connect to SpatialOS.")]
+        public string SpatialOsHost { get; set; } = "localhost";
+
+        [Option("spatialos-port", Description = "The port to use to connect to SpatialOS.")]
+        public ushort SpatialOsPort { get; set; } = 7777;
+
+        private static Task<int> Main(string[] args)
         {
             AppDomain.CurrentDomain.UnhandledException += (sender, eventArgs) =>
             {
@@ -26,71 +38,48 @@ namespace GameLogic
                 }
             };
 
-            IWorkerOptions? options = null;
-
-            Parser.Default.ParseArguments<ReceptionistOptions>(args)
-                .WithParsed(opts => options = opts);
-
-            if (options == null)
-            {
-                return 1;
-            }
-
-            if (options.UnknownPositionalArguments.Any())
-            {
-                Console.Error.WriteLine($@"Unknown positional arguments: [{string.Join(", ", options.UnknownPositionalArguments)}]");
-                return 1;
-            }
-
             try
             {
-                await RunAsync(options);
-            }
-            catch (Exception e)
-            {
-                Log.Error(e, "Failed to run");
-                return 1;
+                return CommandLineApplication.ExecuteAsync<Program>(args);
             }
             finally
             {
                 Log.CloseAndFlush();
             }
-
-            return 0;
         }
 
-        private static async Task RunAsync(IWorkerOptions options)
+        private async Task RunAsync(CommandLineApplication app, CancellationToken token)
         {
-            if (string.IsNullOrEmpty(options.LogFileName))
+            if (string.IsNullOrEmpty(LogFileName))
             {
-                options.LogFileName = Path.Combine(Environment.CurrentDirectory, options.WorkerName ?? WorkerType + ".log");
+                LogFileName = Path.Combine(Environment.CurrentDirectory, WorkerName ?? $"{WorkerType}.log");
             }
 
             Log.Logger = new LoggerConfiguration()
                 .Enrich.FromLogContext()
                 .MinimumLevel.Debug()
                 .WriteTo.Console()
-                .WriteTo.File(options.LogFileName)
+                .WriteTo.File(LogFileName)
                 .CreateLogger();
 
-            Log.Debug($"Opened logfile {options.LogFileName}");
+            Log.Debug($"Opened logfile {LogFileName}");
 
             var connectionParameters = new ConnectionParameters
             {
                 EnableProtocolLoggingAtStartup = true,
                 ProtocolLogging = new ProtocolLoggingParameters
                 {
-                    LogPrefix = Path.ChangeExtension(options.LogFileName, string.Empty) + "-protocol"
+                    LogPrefix = Path.ChangeExtension(LogFileName, string.Empty) + "-protocol"
                 },
                 WorkerType = WorkerType,
                 DefaultComponentVtable = new ComponentVtable()
             };
 
-            using (var connection = await WorkerConnection.ConnectAsync(options, connectionParameters).ConfigureAwait(false))
+            using (var connection = await WorkerConnection.ConnectAsync(this, connectionParameters, token).ConfigureAwait(false))
             {
                 connection.StartSendingMetrics();
 
-                foreach (var opList in connection.GetOpLists())
+                foreach (var opList in connection.GetOpLists(token))
                 {
                     ProcessOpList(opList);
                 }
