@@ -26,7 +26,7 @@ namespace GameLogic
         [Option("spatialos-port", Description = "The port to use to connect to SpatialOS.")]
         public ushort SpatialOsPort { get; set; } = 7777;
 
-        private static Task<int> Main(string[] args)
+        private static async Task<int> Main(string[] args)
         {
             AppDomain.CurrentDomain.UnhandledException += (sender, eventArgs) =>
             {
@@ -40,7 +40,7 @@ namespace GameLogic
 
             try
             {
-                return CommandLineApplication.ExecuteAsync<Program>(args);
+                return await CommandLineApplication.ExecuteAsync<Program>(args);
             }
             finally
             {
