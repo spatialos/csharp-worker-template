@@ -1,20 +1,18 @@
-using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Threading;
-using System.Threading.Tasks;
 using Improbable.Worker.CInterop;
 
 namespace Improbable.Stdlib
 {
     public class EventProcessor<T> : IOpProcessor where T : struct
     {
-        private readonly uint componentId;
-        private readonly GetEventsHandler getEvents;
-        private readonly ConcurrentQueue<T> eventBuffer = new ConcurrentQueue<T>();
-
         public delegate bool GetEventsHandler(SchemaComponentUpdate update, out ImmutableArray<T> events);
+
+        private readonly uint componentId;
+        private readonly BlockingCollection<T> events = new BlockingCollection<T>();
+        private readonly GetEventsHandler getEvents;
 
         public EventProcessor(uint componentId, GetEventsHandler getEvents)
         {
@@ -33,25 +31,14 @@ namespace Improbable.Stdlib
 
                 foreach (var evt in newEvents)
                 {
-                    eventBuffer.Enqueue(evt);
+                    events.Add(evt);
                 }
             }
         }
 
-        public IEnumerable<T> GetEvents(TimeSpan timeout, CancellationToken cancellation = default)
+        public IEnumerable<T> GetEvents(CancellationToken token = default)
         {
-            while (true)
-            {
-                cancellation.ThrowIfCancellationRequested();
-
-                while (eventBuffer.TryDequeue(out var evt))
-                {
-                    cancellation.ThrowIfCancellationRequested();
-                    yield return evt;
-                }
-
-                Task.Delay(timeout, cancellation).Wait(cancellation);
-            }
+            return events.GetConsumingEnumerable(token);
         }
     }
 }
