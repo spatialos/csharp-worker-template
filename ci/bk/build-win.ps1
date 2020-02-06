@@ -2,12 +2,6 @@ $ErrorActionPreference = "Stop"
 
 Set-Location "$PSScriptRoot/../../"
 
-& docker --version
-
-if (!$?) {
-    exit 1
-}
-
 ./scripts/build-nuget-packages.ps1
 if (!$?) {
     exit 1
