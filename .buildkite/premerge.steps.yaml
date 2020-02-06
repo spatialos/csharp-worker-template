@@ -53,9 +53,9 @@ steps:
   - label: "build-database-sync-worker"
     trigger: "database-sync-worker-premerge"
     build:
-      branch: $"{ORIGINAL_BRANCH:-master}"
+      branch: "${ORIGINAL_BRANCH:-master}"
       env:
-        ORIGINAL_BRANCH: "{ORIGINAL_BRANCH:-master}"
+        ORIGINAL_BRANCH: "${ORIGINAL_BRANCH:-master}"
         CSHARP_BUILD_ID: "${BUILDKITE_BUILD_ID}"
         CSHARP_JOB_ID: "${BUILDKITE_JOB_ID}"
     <<: *linux
