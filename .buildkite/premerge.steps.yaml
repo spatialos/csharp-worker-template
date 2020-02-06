@@ -38,7 +38,7 @@ steps:
     id: "test-linux"
     command: "ci/bk/linux.sh"
     artifact_paths:
-      - "/tmp/${BUILDKITE_BUILD_ID}/**/*"
+      - "/tmp/${UNIQUE_BUILD_PATH}*/**/*"
     plugins:
       - ./.buildkite/plugins/setup-environment:
     <<: *linux
@@ -46,14 +46,14 @@ steps:
   - label: "build-windows"
     command: "powershell -NoProfile -NonInteractive -File ci/bk/build-win.ps1"
     artifact_paths:
-      - "/tmp/${BUILDKITE_BUILD_ID}/**/*"
+      - "/tmp/${UNIQUE_BUILD_PATH}*/**/*"
     <<: *windows
 
     # Wait for successful build on this pipeline before kicking off dependent pipelines.
   - wait
 
   - label: "upload-pipeline"
-    command: "mkdir -p nupkgs && dotnet run --project scripts/GetDependentBranchNames | buildkite-agent pipeline upload"
+    command: "dotnet run --project scripts/GetDependentBranchNames | buildkite-agent pipeline upload"
     <<: *linux
 
   - label: "annotate test results :pencil2:"
@@ -64,7 +64,7 @@ steps:
       - improbable/test-summary#8301ac00fe128026db8179a5e1dd4092df41be6f:
           inputs:
             - label: ":octagonal_sign: Test failures "
-              artifact_path: "tmp/${BUILDKITE_BUILD_ID}/*-tests/*"
+              artifact_path: "/tmp/${UNIQUE_BUILD_PATH}/*-tests/*"
               type: nunit
           formatter:
             type: details
