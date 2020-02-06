@@ -13,10 +13,9 @@ TIMESTAMP=$(date +"%y%m%d%H%M%S%N")
 export DOCKER_COMPOSE_NAME="compose_${GIT_HASH}_${TIMESTAMP}"
 
 # Create volume mount points for build artifacts. These are consumed in the docker compose files.
-export UNIQUE_BUILD_PATH="${BUILDKITE_BUILD_ID}/${BUILDKITE_JOB_ID}"
-export LOGS_DIR="/tmp/${UNIQUE_BUILD_PATH}-logs"
-export TEST_RESULTS_DIR="/tmp/${UNIQUE_BUILD_PATH}-tests"
-export NUGET_PACKAGE_DIR="/tmp/${UNIQUE_BUILD_PATH}-nupkgs"
+export LOGS_DIR="/tmp/${BUILDKITE_BUILD_ID}-logs"
+export TEST_RESULTS_DIR="/tmp/${BUILDKITE_BUILD_ID}-tests"
+export NUGET_PACKAGE_DIR="/tmp/${BUILDKITE_BUILD_ID}-nupkgs"
 
 mkdir -p "${LOGS_DIR}"
 mkdir -p "${TEST_RESULTS_DIR}"
