@@ -6,6 +6,6 @@ services:
       context: ../../
     volumes:
         - ${IMPROBABLE_CONFIG_DIR}:/var/spatial_oauth
-        - ${NUGET_PACKAGE_DIR}:nupkgs
+        - ${NUGET_PACKAGE_DIR}:/build/worker/nupkgs
     environment:
         - IMPROBABLE_CONFIG_DIR=/var/spatial_oauth/
