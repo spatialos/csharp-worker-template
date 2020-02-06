@@ -4,6 +4,7 @@ services:
     build:
       dockerfile: ci/docker/linux.Dockerfile
       context: ../../
+    command: ["ci/docker/entrypoint.sh", "ci/test.sh"]
     volumes:
         - ${IMPROBABLE_CONFIG_DIR}:/var/spatial_oauth
         - ${NUGET_PACKAGE_DIR}:/build/worker/nupkgs
