@@ -10,3 +10,4 @@ services:
         - ${NUGET_PACKAGE_DIR}:/build/worker/nupkgs
     environment:
         - IMPROBABLE_CONFIG_DIR=/var/spatial_oauth/
+        - ORIGINAL_BRANCH=${ORIGINAL_BRANCH}

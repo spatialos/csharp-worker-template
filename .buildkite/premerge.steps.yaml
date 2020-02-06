@@ -50,8 +50,14 @@ steps:
     # Wait for successful build on this pipeline before kicking off dependent pipelines.
   - wait
 
-  - label: "upload-pipeline"
-    command: "dotnet run --project scripts/GetDependentBranchNames | buildkite-agent pipeline upload"
+  - label: "build-database-sync-worker"
+    trigger: "database-sync-worker-premerge"
+    build:
+      branch: $"{ORIGINAL_BRANCH:-master}"
+      env:
+        ORIGINAL_BRANCH: "{ORIGINAL_BRANCH:-master}"
+        CSHARP_BUILD_ID: "${BUILDKITE_BUILD_ID}"
+        CSHARP_JOB_ID: "${BUILDKITE_JOB_ID}"
     <<: *linux
 
   - label: "annotate test results :pencil2:"
