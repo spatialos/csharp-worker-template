@@ -58,7 +58,6 @@ steps:
         ORIGINAL_BRANCH: "${ORIGINAL_BRANCH:-master}"
         CSHARP_BUILD_ID: "${BUILDKITE_BUILD_ID}"
         CSHARP_JOB_ID: "${BUILDKITE_JOB_ID}"
-    <<: *linux
 
   - label: "annotate test results :pencil2:"
     depends_on:
