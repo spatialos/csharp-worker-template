@@ -35,8 +35,14 @@ namespace CSharpCodeGenerator
                 CreateLogger();
 
             Log.Information("{Args}", string.Join(" ", ArgumentEscaper.EscapeAndConcatenate(args)));
-            
-            CommandLineApplication.Execute<Program>(args);
+            try
+            {
+                CommandLineApplication.Execute<Program>(args);
+            }
+            finally
+            {
+                Log.CloseAndFlush();
+            }
         }
 
         private void OnExecute(CommandLineApplication app)
