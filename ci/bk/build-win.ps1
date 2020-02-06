@@ -1,7 +1,9 @@
 $ErrorActionPreference = "Stop"
 
 Set-Location "$PSScriptRoot/../../"
-$env:NUGET_PACKAGES="./nuget-cache"
+
+mkdir ./nuget-cache
+$env:NUGET_PACKAGES=Resolve-Path "./nuget-cache"
 
 ./scripts/build-nuget-packages.ps1
 if (!$?) {
