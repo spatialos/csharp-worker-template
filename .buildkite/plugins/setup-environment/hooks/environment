@@ -16,9 +16,11 @@ export DOCKER_COMPOSE_NAME="compose_${GIT_HASH}_${TIMESTAMP}"
 export UNIQUE_BUILD_PATH="${BUILDKITE_BUILD_ID}/${BUILDKITE_JOB_ID}"
 export LOGS_DIR="/tmp/${UNIQUE_BUILD_PATH}-logs"
 export TEST_RESULTS_DIR="/tmp/${UNIQUE_BUILD_PATH}-tests"
+export NUGET_PACKAGE_DIR="/tmp/${UNIQUE_BUILD_PATH}-nupkgs"
 
 mkdir -p "${LOGS_DIR}"
 mkdir -p "${TEST_RESULTS_DIR}"
+mkdir -p "${NUGET_PACKAGE_DIR}"
 
 # Create volume mount point for the build secret, and put it into the default location.
 # This is mounted as a volume in the docker compose files.
